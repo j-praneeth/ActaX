@@ -1,0 +1,223 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { supabaseService } from "./services/supabase";
+import { recallAIService } from "./services/recall-ai";
+import { oauthService } from "./services/oauth";
+import { authMiddleware, type AuthenticatedRequest } from "./middleware/auth";
+import { insertMeetingSchema, insertIntegrationSchema, insertWebhookEventSchema } from "@shared/schema";
+import { z } from "zod";
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth routes
+  app.post("/api/auth/verify", async (req, res) => {
+    try {
+      const { token } = req.body;
+      if (!token) {
+        return res.status(401).json({ message: "Token required" });
+      }
+
+      const user = await supabaseService.verifyAuthToken(token);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid token" });
+      }
+
+      res.json({ user });
+    } catch (error) {
+      console.error("Auth verification error:", error);
+      res.status(500).json({ message: "Authentication failed" });
+    }
+  });
+
+  // Meetings routes
+  app.get("/api/meetings", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.json([]);
+      }
+
+      const meetings = await storage.getMeetingsByOrganization(organizations[0].id);
+      res.json(meetings);
+    } catch (error) {
+      console.error("Get meetings error:", error);
+      res.status(500).json({ message: "Failed to fetch meetings" });
+    }
+  });
+
+  app.post("/api/meetings", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const meetingData = insertMeetingSchema.parse({
+        ...req.body,
+        organizationId: organizations[0].id,
+      });
+
+      const meeting = await storage.createMeeting(meetingData);
+
+      // Start Recall.ai bot if meeting URL is provided
+      if (meeting.meetingUrl) {
+        try {
+          const botId = await recallAIService.startBot(meeting.meetingUrl, meeting.id);
+          await storage.updateMeeting(meeting.id, { recallBotId: botId });
+        } catch (error) {
+          console.error("Failed to start Recall.ai bot:", error);
+        }
+      }
+
+      res.json(meeting);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid meeting data", errors: error.errors });
+      }
+      console.error("Create meeting error:", error);
+      res.status(500).json({ message: "Failed to create meeting" });
+    }
+  });
+
+  app.get("/api/meetings/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const meeting = await storage.getMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+
+      // Check if user has access to this meeting
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      res.json(meeting);
+    } catch (error) {
+      console.error("Get meeting error:", error);
+      res.status(500).json({ message: "Failed to fetch meeting" });
+    }
+  });
+
+  // Integrations routes
+  app.get("/api/integrations", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.json([]);
+      }
+
+      const integrations = await storage.getIntegrationsByOrganization(organizations[0].id);
+      
+      // Remove sensitive data before sending
+      const safeIntegrations = integrations.map(integration => ({
+        ...integration,
+        accessToken: undefined,
+        refreshToken: undefined,
+      }));
+
+      res.json(safeIntegrations);
+    } catch (error) {
+      console.error("Get integrations error:", error);
+      res.status(500).json({ message: "Failed to fetch integrations" });
+    }
+  });
+
+  app.post("/api/integrations/:provider/connect", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const provider = req.params.provider;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const authUrl = await oauthService.getAuthUrl(provider, organizations[0].id);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("OAuth connect error:", error);
+      res.status(500).json({ message: "Failed to initiate OAuth connection" });
+    }
+  });
+
+  app.post("/api/integrations/callback", async (req, res) => {
+    try {
+      const { code, state, provider } = req.body;
+      
+      if (!code || !state || !provider) {
+        return res.status(400).json({ message: "Missing OAuth parameters" });
+      }
+
+      const integration = await oauthService.handleCallback(provider, code, state);
+      res.json({ success: true, integration: { ...integration, accessToken: undefined, refreshToken: undefined } });
+    } catch (error) {
+      console.error("OAuth callback error:", error);
+      res.status(500).json({ message: "OAuth callback failed" });
+    }
+  });
+
+  // Webhook routes
+  app.post("/api/webhooks/recall", async (req, res) => {
+    try {
+      const event = insertWebhookEventSchema.parse({
+        source: "recall_ai",
+        eventType: req.body.event || "unknown",
+        payload: req.body,
+      });
+
+      const webhookEvent = await storage.createWebhookEvent(event);
+      
+      // Process the webhook
+      await recallAIService.processWebhook(webhookEvent);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Webhook processing error:", error);
+      res.status(500).json({ message: "Webhook processing failed" });
+    }
+  });
+
+  // Analytics routes
+  app.get("/api/analytics/meetings", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.json({
+          totalMeetings: 0,
+          completedMeetings: 0,
+          scheduledMeetings: 0,
+          inProgressMeetings: 0,
+        });
+      }
+
+      const meetings = await storage.getMeetingsByOrganization(organizations[0].id);
+      
+      const analytics = {
+        totalMeetings: meetings.length,
+        completedMeetings: meetings.filter(m => m.status === "completed").length,
+        scheduledMeetings: meetings.filter(m => m.status === "scheduled").length,
+        inProgressMeetings: meetings.filter(m => m.status === "in_progress").length,
+      };
+
+      res.json(analytics);
+    } catch (error) {
+      console.error("Analytics error:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}

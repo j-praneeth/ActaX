@@ -54,16 +54,24 @@ export const authService = {
   },
 
   async getCurrentUser(): Promise<AuthUser | null> {
-    const { data: { user }, error } = await supabase.auth.getUser();
+    // First check if there's a valid session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
-    if (error) throw error;
-    if (!user) return null;
+    if (sessionError) {
+      // If there's a session error, it might be a missing session - that's okay
+      console.warn('Session error:', sessionError);
+      return null;
+    }
+    
+    if (!session?.user) {
+      return null;
+    }
 
     return {
-      id: user.id,
-      email: user.email!,
-      name: user.user_metadata?.name || '',
-      role: user.user_metadata?.role || 'member',
+      id: session.user.id,
+      email: session.user.email!,
+      name: session.user.user_metadata?.name || '',
+      role: session.user.user_metadata?.role || 'member',
     };
   },
 

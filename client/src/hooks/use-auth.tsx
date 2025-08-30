@@ -19,7 +19,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial user
     authService.getCurrentUser()
       .then(setUser)
-      .catch(console.error)
+      .catch((error) => {
+        // Only log actual errors, not missing sessions
+        if (error.message !== 'Auth session missing!') {
+          console.error('Auth error:', error);
+        }
+      })
       .finally(() => setLoading(false));
 
     // Listen for auth changes

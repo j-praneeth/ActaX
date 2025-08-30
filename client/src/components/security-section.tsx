@@ -32,7 +32,7 @@ export function SecuritySection() {
       color: "bg-blue-600",
     },
     {
-      title: "HIPAA Compliant",
+      title: "HIPAA BAA",
       description: "Business Associate Agreement for HIPAA Compliance",
       icon: "🏥",
       color: "bg-green-600",
@@ -44,7 +44,7 @@ export function SecuritySection() {
       color: "bg-purple-600",
     },
     {
-      title: "HIPAA Compliant",
+      title: "HIPAA Healthcare",
       description: "HIPAA for healthcare organizations",
       icon: "⚕️",
       color: "bg-red-600",

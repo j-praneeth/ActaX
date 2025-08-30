@@ -1,0 +1,1143 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acta AI - AI Meeting Assistant & Note Taker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)", 
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    popover: {
+                        DEFAULT: "var(--popover)",
+                        foreground: "var(--popover-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    destructive: {
+                        DEFAULT: "var(--destructive)",
+                        foreground: "var(--destructive-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                },
+                fontFamily: {
+                    sans: ["Inter", "sans-serif"],
+                }
+            },
+        }
+    };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --background: hsl(0 0% 100%);
+            --foreground: hsl(222.2 84% 4.9%);
+            --card: hsl(0 0% 100%);
+            --card-foreground: hsl(222.2 84% 4.9%);
+            --popover: hsl(0 0% 100%);
+            --popover-foreground: hsl(222.2 84% 4.9%);
+            --primary: hsl(262.1 83.3% 57.8%);
+            --primary-foreground: hsl(210 40% 98%);
+            --secondary: hsl(210 40% 96%);
+            --secondary-foreground: hsl(222.2 84% 4.9%);
+            --muted: hsl(210 40% 96%);
+            --muted-foreground: hsl(215.4 16.3% 46.9%);
+            --accent: hsl(210 40% 96%);
+            --accent-foreground: hsl(222.2 84% 4.9%);
+            --destructive: hsl(0 84.2% 60.2%);
+            --destructive-foreground: hsl(210 40% 98%);
+            --border: hsl(214.3 31.8% 91.4%);
+            --input: hsl(214.3 31.8% 91.4%);
+            --ring: hsl(262.1 83.3% 57.8%);
+            --radius: 0.75rem;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .animate-slide {
+            animation: slide 20s linear infinite;
+        }
+        
+        @keyframes slide {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+    </style>
+</head>
+<body class="font-sans">
+    <!-- @COMPONENT: Header -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                        <span class="text-white font-bold text-sm">A</span>
+                    </div>
+                    <span class="text-xl font-bold text-gray-900">Acta</span>
+                </div>
+                
+                <!-- Navigation -->
+                <nav class="hidden md:flex items-center space-x-8">
+                    <a href="#" class="text-gray-600 hover:text-gray-900 transition-colors">Agents</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900 transition-colors">Mobile Apps</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900 transition-colors">Chrome Extension</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900 transition-colors">Tools</a>
+                    <a href="#" class="text-gray-600 hover:text-gray-900 transition-colors">Resources</a>
+                </nav>
+                
+                <!-- CTA Buttons -->
+                <div class="flex items-center space-x-4">
+                    <button class="text-gray-600 hover:text-gray-900 transition-colors">Login</button>
+                    <button class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg hover:shadow-lg transition-all">
+                        Get Started Free
+                    </button>
+                </div>
+                
+                <!-- Mobile Menu -->
+                <button class="md:hidden">
+                    <i class="fas fa-bars text-gray-600"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    <!-- @END_COMPONENT: Header -->
+
+    <!-- @COMPONENT: Hero Section -->
+    <section class="hero-gradient relative min-h-screen flex items-center pt-16 overflow-hidden">
+        <!-- Animated Background Elements -->
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-20 left-10 w-72 h-72 bg-purple-500 rounded-full blur-3xl animate-float"></div>
+            <div class="absolute bottom-20 right-10 w-96 h-96 bg-blue-500 rounded-full blur-3xl animate-float" style="animation-delay: -2s;"></div>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <!-- Left Content -->
+                <div class="text-center lg:text-left">
+                    <div class="mb-6">
+                        <span class="inline-block px-4 py-2 bg-purple-600/20 text-purple-300 rounded-full text-sm font-medium">
+                            We are not the First, But we are THE BEST.
+                        </span>
+                    </div>
+                    
+                    <h1 class="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
+                        Go beyond meeting notes with 
+                        <span class="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                            Acta Agents
+                        </span>
+                    </h1>
+                    
+                    <p class="text-xl text-gray-300 mb-8 leading-relaxed">
+                        Acta Agents understand the context, and transform conversations into structured, actionable insights — PRDs, follow-ups, reports, deal summaries, even technical breakdowns.
+                    </p>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4 mb-8">
+                        <button class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:shadow-2xl transition-all transform hover:scale-105">
+                            Request Demo
+                        </button>
+                        <button class="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white/20 transition-all">
+                            Get Started for Free
+                        </button>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-6 text-gray-400 text-sm">
+                        <span class="flex items-center"><i class="fas fa-check text-green-400 mr-2"></i>No credit card required</span>
+                        <span class="flex items-center"><i class="fas fa-check text-green-400 mr-2"></i>14-day free trial</span>
+                        <span class="flex items-center"><i class="fas fa-check text-green-400 mr-2"></i>Cancel Anytime</span>
+                    </div>
+                </div>
+                
+                <!-- Right Content - App Screenshots -->
+                <div class="relative">
+                    <!-- Modern conference room with team meeting -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-4">
+                            <img src="https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&h=600" alt="Modern conference room meeting" class="rounded-xl shadow-2xl animate-float w-full h-auto" />
+                            <!-- Professional team in video conference -->
+                            <img src="https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&h=600" alt="Professional video conference meeting" class="rounded-xl shadow-2xl animate-float w-full h-auto" style="animation-delay: -1s;" />
+                        </div>
+                        <div class="space-y-4 mt-8">
+                            <!-- AI technology visualization -->
+                            <img src="https://images.unsplash.com/photo-1620712943543-bcc4688e7485?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&h=600" alt="AI technology dashboard" class="rounded-xl shadow-2xl animate-float w-full h-auto" style="animation-delay: -2s;" />
+                            <!-- Business dashboard interface -->
+                            <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&h=600" alt="Business analytics dashboard" class="rounded-xl shadow-2xl animate-float w-full h-auto" style="animation-delay: -3s;" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Hero Section -->
+
+    <!-- @COMPONENT: Features Section -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Executive Summary and Features -->
+            <div class="grid lg:grid-cols-2 gap-16 items-center mb-20">
+                <div>
+                    <!-- Modern meeting room with digital displays -->
+                    <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&h=700" alt="Modern meeting room with digital displays" class="rounded-2xl shadow-2xl w-full h-auto" />
+                </div>
+                <div>
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div class="bg-purple-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-purple-900 mb-2">Executive Summary</h3>
+                            <p class="text-sm text-purple-700">Comprehensive meeting overviews</p>
+                        </div>
+                        <div class="bg-blue-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-blue-900 mb-2">Key Topics</h3>
+                            <p class="text-sm text-blue-700">Automatic topic identification</p>
+                        </div>
+                        <div class="bg-indigo-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-indigo-900 mb-2">Action Points</h3>
+                            <p class="text-sm text-indigo-700">Actionable next steps</p>
+                        </div>
+                        <div class="bg-purple-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-purple-900 mb-2">Ask ACTA</h3>
+                            <p class="text-sm text-purple-700">AI-powered insights</p>
+                        </div>
+                        <div class="bg-cyan-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-cyan-900 mb-2">Questions & Answers</h3>
+                            <p class="text-sm text-cyan-700">Meeting Q&A tracking</p>
+                        </div>
+                        <div class="bg-blue-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-blue-900 mb-2">Transcript</h3>
+                            <p class="text-sm text-blue-700">Full conversation records</p>
+                        </div>
+                        <div class="bg-green-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-green-900 mb-2">Decisions</h3>
+                            <p class="text-sm text-green-700">Decision tracking</p>
+                        </div>
+                        <div class="bg-orange-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-orange-900 mb-2">Takeaways</h3>
+                            <p class="text-sm text-orange-700">Key insights extraction</p>
+                        </div>
+                        <div class="bg-pink-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-pink-900 mb-2">Sentiment</h3>
+                            <p class="text-sm text-pink-700">Meeting mood analysis</p>
+                        </div>
+                        <div class="bg-violet-50 p-6 rounded-xl card-hover">
+                            <h3 class="font-semibold text-violet-900 mb-2">Reports</h3>
+                            <p class="text-sm text-violet-700">Detailed analytics</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Features Section -->
+
+    <!-- @COMPONENT: Why Acta Agent Section -->
+    <section class="py-20 hero-gradient relative overflow-hidden">
+        <div class="absolute inset-0 opacity-5">
+            <div class="absolute top-20 right-20 w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">Why Acta Agent?</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Imagine turning every meeting into real action — instantly and automatically.
+                </p>
+            </div>
+            
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <div class="space-y-8">
+                    <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-6 rounded-xl">
+                        <h3 class="text-xl font-semibold text-white mb-3">Role-Aware Intelligence</h3>
+                        <p class="text-gray-300">Whether you're in PM, Sales, HR, or any other function, Acta AI adapts to your unique needs.</p>
+                    </div>
+                    
+                    <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-6 rounded-xl">
+                        <h3 class="text-xl font-semibold text-white mb-3">Beyond Note-Taking</h3>
+                        <p class="text-gray-300">We don't just record discussions — we power execution by capturing tasks and follow-ups live, not afterward.</p>
+                    </div>
+                    
+                    <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-6 rounded-xl">
+                        <h3 class="text-xl font-semibold text-white mb-3">Structured Outcomes</h3>
+                        <p class="text-gray-300">Transform conversations into clear, role-specific deliverables — PRDs for PMs, pipelines for Sales, hire plans for HR, and more.</p>
+                    </div>
+                    
+                    <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-6 rounded-xl">
+                        <h3 class="text-xl font-semibold text-white mb-3">Deep Workflow Integration</h3>
+                        <p class="text-gray-300">Seamlessly link with Jira, Notion, and the tools you already use — no extra steps required.</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <!-- AI technology interface -->
+                    <img src="https://images.unsplash.com/photo-1677442136019-21780ecad995?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&h=700" alt="AI technology interface and analytics" class="rounded-2xl shadow-2xl w-full h-auto" />
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Why Acta Agent Section -->
+
+    <!-- @COMPONENT: Trusted Brands Section -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Trusted by Leading Organizations</h2>
+                <p class="text-xl text-gray-600">Join hundreds of innovative companies transforming their meetings with Acta</p>
+            </div>
+            
+            <!-- Animated Brand Logos -->
+            <div class="relative overflow-hidden">
+                <div class="flex animate-slide space-x-12 w-max">
+                    <!-- First set of brands -->
+                    <div class="flex items-center space-x-12">
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">Density</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">Monyx</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">EnrichMoney</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">EduHubspot</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">Niyom</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">FabAlley</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">Revinate</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">Clarivate</span>
+                        </div>
+                    </div>
+                    <!-- Duplicate set for seamless animation -->
+                    <div class="flex items-center space-x-12">
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">BITS Pilani</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">Webiks</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">Expertia</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">Paddle</span>
+                        </div>
+                        <div class="w-32 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <span class="text-gray-600 font-semibold">Informa</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Trusted Brands Section -->
+
+    <!-- @COMPONENT: Chrome Extension Section -->
+    <section class="py-20 bg-gradient-to-br from-purple-50 to-blue-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Download Acta Chrome Extension</h2>
+                <p class="text-xl text-gray-600 mb-12">One Extension for Google Meet, MS Teams and Zoom</p>
+                
+                <div class="flex justify-center items-center space-x-8 mb-12">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center mb-3 mx-auto">
+                            <i class="fab fa-microsoft text-white text-2xl"></i>
+                        </div>
+                        <span class="text-gray-700 font-medium">Microsoft Teams</span>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-red-600 rounded-lg flex items-center justify-center mb-3 mx-auto">
+                            <i class="fab fa-google text-white text-2xl"></i>
+                        </div>
+                        <span class="text-gray-700 font-medium">Google Meet</span>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-blue-500 rounded-lg flex items-center justify-center mb-3 mx-auto">
+                            <i class="fas fa-video text-white text-2xl"></i>
+                        </div>
+                        <span class="text-gray-700 font-medium">Zoom</span>
+                    </div>
+                </div>
+                
+                <button class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:shadow-xl transition-all transform hover:scale-105 flex items-center mx-auto">
+                    <i class="fab fa-chrome mr-3 text-xl"></i>
+                    Get It On Chrome
+                </button>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Chrome Extension Section -->
+
+    <!-- @COMPONENT: Meeting Productivity Features -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Boost Meeting Productivity using Acta Agent</h2>
+            </div>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Meeting Summary -->
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-2xl card-hover">
+                    <div class="w-16 h-16 bg-purple-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-file-alt text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Meeting Summary</h3>
+                    <p class="text-gray-700 mb-6">Receive a concise summary of your meeting's key points, decisions, and takeaways.</p>
+                    <a href="#" class="text-purple-600 font-semibold hover:text-purple-700 transition-colors">Learn more →</a>
+                </div>
+                
+                <!-- Action Items -->
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-2xl card-hover">
+                    <div class="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-tasks text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Action Items</h3>
+                    <p class="text-gray-700 mb-6">Automatically generate a list of action items, ensuring accountability and follow-through.</p>
+                    <a href="#" class="text-blue-600 font-semibold hover:text-blue-700 transition-colors">Learn more →</a>
+                </div>
+                
+                <!-- Key Topics -->
+                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 p-8 rounded-2xl card-hover">
+                    <div class="w-16 h-16 bg-indigo-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-lightbulb text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Key Topics</h3>
+                    <p class="text-gray-700 mb-6">Automatically generate a list of Key Topics discussed during the meeting.</p>
+                    <a href="#" class="text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">Learn more →</a>
+                </div>
+                
+                <!-- Takeaways -->
+                <div class="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-2xl card-hover">
+                    <div class="w-16 h-16 bg-green-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-star text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Takeaways</h3>
+                    <p class="text-gray-700 mb-6">Able to define key Takeaways from meeting.</p>
+                    <a href="#" class="text-green-600 font-semibold hover:text-green-700 transition-colors">Learn more →</a>
+                </div>
+                
+                <!-- Integrations -->
+                <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-8 rounded-2xl card-hover">
+                    <div class="w-16 h-16 bg-orange-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-plug text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Integrations</h3>
+                    <p class="text-gray-700 mb-6">Integrates with popular video conferencing platforms like Google Meet, Zoom and Microsoft Teams.</p>
+                    <a href="#" class="text-orange-600 font-semibold hover:text-orange-700 transition-colors">Learn more →</a>
+                </div>
+                
+                <!-- Calendar Integration -->
+                <div class="bg-gradient-to-br from-pink-50 to-pink-100 p-8 rounded-2xl card-hover">
+                    <div class="w-16 h-16 bg-pink-600 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-calendar text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Calendar Integration</h3>
+                    <p class="text-gray-700 mb-6">Acta able to integrate google and MS teams calendar</p>
+                    <a href="#" class="text-pink-600 font-semibold hover:text-pink-700 transition-colors">Learn more →</a>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Meeting Productivity Features -->
+
+    <!-- @COMPONENT: Ask Acta Agent Section -->
+    <section class="py-20 hero-gradient relative overflow-hidden">
+        <div class="absolute inset-0 opacity-5">
+            <div class="absolute bottom-20 left-20 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <div>
+                    <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">Ask Acta Agent</h2>
+                    <p class="text-xl text-gray-300 mb-8">
+                        Get instant insights from your meeting conversations. Ask Acta to help you track key decisions, tasks, and contributions from your meetings with ease.
+                    </p>
+                    
+                    <div class="space-y-6">
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <i class="fas fa-check text-white text-sm"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white mb-2">Track Decisions</h3>
+                                <p class="text-gray-300">Ask Acta to summarize the key decisions made during the meeting.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <i class="fas fa-chart-line text-white text-sm"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white mb-2">Monitor Deals</h3>
+                                <p class="text-gray-300">Ask Acta to check if any Finance deals were finalized during the call.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <i class="fas fa-users text-white text-sm"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white mb-2">Review Contributions</h3>
+                                <p class="text-gray-300">Ask Acta to provide insights on Mark's contributions during the meeting.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <i class="fas fa-user-check text-white text-sm"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white mb-2">Evaluate Candidates</h3>
+                                <p class="text-gray-300">Ask Acta if the candidate can proceed to the technical interview stage.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <!-- Business dashboard with AI analytics -->
+                    <img src="https://images.unsplash.com/photo-1642790106117-e829e14a795f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&h=700" alt="AI-powered business dashboard with analytics" class="rounded-2xl shadow-2xl w-full h-auto" />
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Ask Acta Agent Section -->
+
+    <!-- @COMPONENT: Meeting Types Section -->
+    <section class="py-20 bg-gradient-to-br from-gray-50 to-gray-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-2xl shadow-lg card-hover">
+                    <div class="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-handshake text-purple-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Sales Discovery Call Notes</h3>
+                    <p class="text-gray-600">Uncover your prospect's needs and identify the key steps to close the deal.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-lg card-hover">
+                    <div class="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-user-friends text-blue-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">User Interview Notes</h3>
+                    <p class="text-gray-600">Gather valuable feedback to create world-class products.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-lg card-hover">
+                    <div class="w-16 h-16 bg-indigo-100 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-sync-alt text-indigo-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Team Sync Notes</h3>
+                    <p class="text-gray-600">Ensure everyone stays aligned and on the same page.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-lg card-hover">
+                    <div class="w-16 h-16 bg-green-100 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-chart-bar text-green-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Performance Review Notes</h3>
+                    <p class="text-gray-600">Document career goals and manager feedback.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-lg card-hover">
+                    <div class="w-16 h-16 bg-orange-100 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-building text-orange-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Board Meeting Notes</h3>
+                    <p class="text-gray-600">Document company priorities and quarterly goals.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-lg card-hover">
+                    <div class="w-16 h-16 bg-pink-100 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-user-tie text-pink-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Manager One-on-One Notes</h3>
+                    <p class="text-gray-600">Focus on the priorities you and your manager align on.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-lg card-hover">
+                    <div class="w-16 h-16 bg-cyan-100 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-clock text-cyan-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Daily Standup Notes</h3>
+                    <p class="text-gray-600">Keep track of blockers and your team's upcoming tasks.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-lg card-hover">
+                    <div class="w-16 h-16 bg-violet-100 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-business-time text-violet-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Business Review Notes</h3>
+                    <p class="text-gray-600">Assess customer satisfaction and identify areas for improvement.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-2xl shadow-lg card-hover">
+                    <div class="w-16 h-16 bg-red-100 rounded-xl flex items-center justify-center mb-6">
+                        <i class="fas fa-project-diagram text-red-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-4">Project Meeting Notes</h3>
+                    <p class="text-gray-600">Identify bottlenecks in project execution and streamline progress.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Meeting Types Section -->
+
+    <!-- @COMPONENT: Testimonials Section -->
+    <section class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Testimonials</h2>
+            </div>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Testimonial 1 -->
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-2xl card-hover">
+                    <div class="flex items-center space-x-1 mb-4">
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                    </div>
+                    <p class="text-gray-700 mb-6 italic">"The automatic transcription is spot on, and the instant summaries save us so much time. It's a must-have tool for anyone looking to streamline their meetings!"</p>
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
+                            <span class="text-white font-semibold">SG</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900">Sophia G</h4>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 2 -->
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-2xl card-hover">
+                    <div class="flex items-center space-x-1 mb-4">
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                    </div>
+                    <p class="text-gray-700 mb-6 italic">"Acta has simplified our team meetings tremendously. Its AI-driven transcription and note-taking are invaluable for staying organized and tracking action items efficiently!"</p>
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
+                            <span class="text-white font-semibold">JM</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900">John M</h4>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 3 -->
+                <div class="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-2xl card-hover">
+                    <div class="flex items-center space-x-1 mb-4">
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                    </div>
+                    <p class="text-gray-700 mb-6 italic">"The automated meeting summaries save us so much time! Our team can focus on strategy without worrying about missing details. Acta is a game-changer for any fast-paced business"</p>
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+                            <span class="text-white font-semibold">SL</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900">Sarah L</h4>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 4 -->
+                <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-8 rounded-2xl card-hover">
+                    <div class="flex items-center space-x-1 mb-4">
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                    </div>
+                    <p class="text-gray-700 mb-6 italic">"Acta has transformed how our meetings are documented. With automated summaries and action points, we're always on top of our tasks. It's easy to use and reliable—highly recommend it!"</p>
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center">
+                            <span class="text-white font-semibold">LR</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900">Liam R</h4>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 5 -->
+                <div class="bg-gradient-to-br from-pink-50 to-pink-100 p-8 rounded-2xl card-hover">
+                    <div class="flex items-center space-x-1 mb-4">
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                    </div>
+                    <p class="text-gray-700 mb-6 italic">"I've never been this organized with meeting notes before. Acta makes note-taking seamless and gives me the flexibility to focus fully on brainstorming sessions"</p>
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-pink-600 rounded-full flex items-center justify-center">
+                            <span class="text-white font-semibold">AB</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900">Aisha B</h4>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Testimonial 6 -->
+                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 p-8 rounded-2xl card-hover">
+                    <div class="flex items-center space-x-1 mb-4">
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                        <i class="fas fa-star text-yellow-400"></i>
+                    </div>
+                    <p class="text-gray-700 mb-6 italic">"As a tech team, accurate meeting records are critical, and Acta delivers. From summarizing discussions to organizing action points, it's the perfect tool for productivity."</p>
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center">
+                            <span class="text-white font-semibold">DS</span>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-900">David S</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Testimonials Section -->
+
+    <!-- @COMPONENT: Pricing Section -->
+    <section class="py-20 hero-gradient relative overflow-hidden">
+        <div class="absolute inset-0 opacity-5">
+            <div class="absolute top-20 left-20 w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-20 right-20 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
+        </div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">Monetize meetings with Acta Agent</h2>
+                
+                <!-- Pricing Toggle -->
+                <div class="flex items-center justify-center space-x-4 mb-12">
+                    <span class="text-gray-300">Monthly</span>
+                    <button class="relative inline-flex h-6 w-11 items-center rounded-full bg-white/20 transition-colors">
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-6"></span>
+                    </button>
+                    <span class="text-white font-semibold">Annually</span>
+                </div>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Free Plan -->
+                <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-8 rounded-2xl">
+                    <div class="text-center mb-8">
+                        <h3 class="text-2xl font-bold text-white mb-4">Free</h3>
+                        <div class="text-4xl font-bold text-white mb-2">₹0</div>
+                        <p class="text-gray-300">per seat/year</p>
+                    </div>
+                    
+                    <button class="w-full bg-white/20 text-white py-3 rounded-lg font-semibold mb-8 border border-white/30">
+                        Current Plan
+                    </button>
+                    
+                    <ul class="space-y-4 text-gray-300">
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Unlimited recordings</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Unlimited transcriptions</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Unlimited meeting duration</li>
+                    </ul>
+                </div>
+                
+                <!-- Pro Plan -->
+                <div class="bg-gradient-to-br from-purple-600 to-blue-600 p-8 rounded-2xl transform scale-105 border-2 border-white/30">
+                    <div class="text-center mb-8">
+                        <div class="bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium mb-4 inline-block">
+                            Most Popular
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-4">Pro</h3>
+                        <div class="text-4xl font-bold text-white mb-2">₹888</div>
+                        <p class="text-gray-100">per seat/month</p>
+                        <p class="text-sm text-gray-200">Billed annually at ₹10,656 💰 Save 11%</p>
+                    </div>
+                    
+                    <button class="w-full bg-white text-purple-600 py-3 rounded-lg font-semibold mb-8 hover:bg-gray-100 transition-colors">
+                        Buy this plan
+                    </button>
+                    
+                    <ul class="space-y-4 text-gray-100">
+                        <li class="flex items-center"><i class="fas fa-check text-green-300 mr-3"></i>Unlimited recordings</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-300 mr-3"></i>Unlimited transcriptions</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-300 mr-3"></i>Unlimited meeting duration</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-300 mr-3"></i>Email notifications</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-300 mr-3"></i>Download reports</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-300 mr-3"></i>Chat feature</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-300 mr-3"></i>Consolidation</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-300 mr-3"></i>Integrations</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-300 mr-3"></i>Agents</li>
+                    </ul>
+                </div>
+                
+                <!-- Enterprise Plan -->
+                <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-8 rounded-2xl">
+                    <div class="text-center mb-8">
+                        <h3 class="text-2xl font-bold text-white mb-4">Enterprise</h3>
+                        <div class="text-4xl font-bold text-white mb-2">Let's Talk</div>
+                    </div>
+                    
+                    <button class="w-full bg-white/20 text-white py-3 rounded-lg font-semibold mb-8 border border-white/30 hover:bg-white/30 transition-colors">
+                        Let's talk
+                    </button>
+                    
+                    <ul class="space-y-4 text-gray-300">
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Unlimited recordings</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Unlimited transcriptions</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Unlimited meeting duration</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Email notifications</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Download reports</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Chat feature</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Consolidation</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Integrations</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>Agents</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>API support</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>White label</li>
+                        <li class="flex items-center"><i class="fas fa-check text-green-400 mr-3"></i>On-premises deployment</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Pricing Section -->
+
+    <!-- @COMPONENT: FAQ Section -->
+    <section class="py-20 bg-white">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6">Frequently asked questions</h2>
+                <p class="text-xl text-gray-600">
+                    Can't find the answer you're looking for? Reach out to our 
+                    <a href="#" class="text-purple-600 hover:text-purple-700 underline">customer support</a> team.
+                </p>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="border border-gray-200 rounded-lg">
+                    <button class="w-full text-left p-6 hover:bg-gray-50 transition-colors" data-faq-toggle>
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-900">How does Acta.ai protect our meeting data in transit and at rest?</h3>
+                            <i class="fas fa-chevron-down text-gray-500 transform transition-transform"></i>
+                        </div>
+                    </button>
+                    <div class="hidden p-6 pt-0 text-gray-600" data-faq-content>
+                        Acta.ai uses 256-bit AES encryption for data at rest and 256-bit SSL/TLS encryption for data in transit. All data is stored in secure, SOC 2 compliant data centers with multiple layers of security protection.
+                    </div>
+                </div>
+                
+                <div class="border border-gray-200 rounded-lg">
+                    <button class="w-full text-left p-6 hover:bg-gray-50 transition-colors" data-faq-toggle>
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-900">Who can access our data, and can we control or restrict access ourselves?</h3>
+                            <i class="fas fa-chevron-down text-gray-500 transform transition-transform"></i>
+                        </div>
+                    </button>
+                    <div class="hidden p-6 pt-0 text-gray-600" data-faq-content>
+                        Only authorized personnel within your organization can access your meeting data. Acta.ai provides comprehensive access controls and role-based permissions to help you manage who can view, edit, or share meeting content.
+                    </div>
+                </div>
+                
+                <div class="border border-gray-200 rounded-lg">
+                    <button class="w-full text-left p-6 hover:bg-gray-50 transition-colors" data-faq-toggle>
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-900">Is Acta.ai compliant with regulations like GDPR, HIPAA, and SOC 2?</h3>
+                            <i class="fas fa-chevron-down text-gray-500 transform transition-transform"></i>
+                        </div>
+                    </button>
+                    <div class="hidden p-6 pt-0 text-gray-600" data-faq-content>
+                        Yes, Acta.ai is fully compliant with GDPR, HIPAA, and SOC 2 Type II standards. We undergo regular security audits and maintain all necessary certifications to ensure your data protection requirements are met.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: FAQ Section -->
+
+    <!-- @COMPONENT: Enterprise Security Section -->
+    <section class="py-20 hero-gradient relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">Enterprise grade security</h2>
+                <p class="text-xl text-gray-300 max-w-3xl mx-auto">
+                    Security and customer privacy is our priority at every step of the engineering process
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-12 items-center mb-16">
+                <div>
+                    <ul class="space-y-6 text-gray-300">
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-shield-alt text-green-400 mt-1"></i>
+                            <span>256-bit AES and 256-bit SSL/TLS encryption</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-chart-line text-blue-400 mt-1"></i>
+                            <span>Security logging, uptime monitoring, and system availability metrics</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-code text-purple-400 mt-1"></i>
+                            <span>Coding practices based on the OWASP Top Ten</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-search text-orange-400 mt-1"></i>
+                            <span>Penetration tests by security experts</span>
+                        </li>
+                        <li class="flex items-start space-x-3">
+                            <i class="fas fa-clipboard-check text-green-400 mt-1"></i>
+                            <span>Regular impact assessments</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <!-- Corporate team meeting in a secure environment -->
+                    <img src="https://images.unsplash.com/photo-1553877522-43269d4ea984?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&h=700" alt="Corporate team meeting in a secure boardroom environment" class="rounded-2xl shadow-2xl w-full h-auto" />
+                </div>
+            </div>
+            
+            <!-- Compliance Badges -->
+            <div class="grid md:grid-cols-4 gap-8 text-center">
+                <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-6 rounded-xl">
+                    <div class="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-certificate text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">SOC 2 Type II</h3>
+                    <p class="text-gray-300 text-sm">Service Organization Control Report</p>
+                </div>
+                
+                <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-6 rounded-xl">
+                    <div class="w-16 h-16 bg-green-600 rounded-lg flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-user-md text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">HIPAA Compliant</h3>
+                    <p class="text-gray-300 text-sm">Business Associate Agreement for HIPAA Compliance</p>
+                </div>
+                
+                <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-6 rounded-xl">
+                    <div class="w-16 h-16 bg-purple-600 rounded-lg flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-shield-alt text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">GDPR</h3>
+                    <p class="text-gray-300 text-sm">General Data Protection Regulation</p>
+                </div>
+                
+                <div class="bg-white/10 backdrop-blur-sm border border-white/20 p-6 rounded-xl">
+                    <div class="w-16 h-16 bg-red-600 rounded-lg flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-hospital text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-white mb-2">HIPAA Compliant</h3>
+                    <p class="text-gray-300 text-sm">HIPAA for healthcare organizations</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Enterprise Security Section -->
+
+    <!-- @COMPONENT: Final CTA Section -->
+    <section class="py-20 bg-gradient-to-br from-purple-600 to-blue-600 relative overflow-hidden">
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-20 left-20 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+            <div class="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+        </div>
+        
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+            <div class="w-16 h-16 bg-white rounded-xl flex items-center justify-center mx-auto mb-8">
+                <span class="text-purple-600 font-bold text-xl">A</span>
+            </div>
+            
+            <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">
+                Ready To See Acta Agent In Action ?
+            </h2>
+            
+            <p class="text-xl text-gray-100 mb-12">
+                Claim your free trial or book a free demo
+            </p>
+            
+            <button class="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:shadow-2xl transition-all transform hover:scale-105">
+                Book A Demo
+            </button>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Final CTA Section -->
+
+    <!-- @COMPONENT: Footer -->
+    <footer class="bg-gray-900 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-sm">A</span>
+                        </div>
+                        <span class="text-xl font-bold">Acta</span>
+                    </div>
+                    <p class="text-gray-400 mb-4">AI-powered meeting assistant that transforms conversations into actionable insights.</p>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold mb-4">Product</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white transition-colors">Agents</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Mobile Apps</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Chrome Extension</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Integrations</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold mb-4">Resources</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white transition-colors">Documentation</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Support</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Terms of Service</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold mb-4">Connect</h3>
+                    <div class="flex space-x-4">
+                        <a href="#" class="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors">
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors">
+                            <i class="fab fa-github"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 Acta AI. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+    <!-- @END_COMPONENT: Footer -->
+
+    <script>
+        (function() {
+            // FAQ Toggle Functionality
+            document.querySelectorAll('[data-faq-toggle]').forEach(button => {
+                button.addEventListener('click', function() {
+                    const content = this.parentElement.querySelector('[data-faq-content]');
+                    const icon = this.querySelector('i');
+                    
+                    if (content.classList.contains('hidden')) {
+                        content.classList.remove('hidden');
+                        icon.style.transform = 'rotate(180deg)';
+                    } else {
+                        content.classList.add('hidden');
+                        icon.style.transform = 'rotate(0deg)';
+                    }
+                });
+            });
+
+            // Smooth scroll for anchor links
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+
+            // Header background on scroll
+            window.addEventListener('scroll', function() {
+                const header = document.querySelector('header');
+                if (window.scrollY > 100) {
+                    header.classList.add('bg-white/90');
+                } else {
+                    header.classList.remove('bg-white/90');
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

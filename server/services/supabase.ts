@@ -2,8 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 import { storage } from '../storage';
 import type { User } from '@shared/schema';
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseUrl = process.env.SUPABASE_URL || 'https://mtmubjshdqxkgxvcazfi.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im10bXVianNoZHF4a2d4dmNhemZpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NjU4MjMwNSwiZXhwIjoyMDcyMTU4MzA1fQ.lYPiH0VRYTiXmOQh9pEfxnF5WedFkMEyFy7q69asYkw';
+
+console.log('supabaseUrl', supabaseUrl);  
+console.log('supabaseServiceKey', supabaseServiceKey);
 
 if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing Supabase environment variables');

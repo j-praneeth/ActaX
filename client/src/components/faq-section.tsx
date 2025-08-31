@@ -6,24 +6,20 @@ export function FaqSection() {
 
   const faqs = [
     {
-      question: "How does Acta.ai protect our meeting data in transit and at rest?",
-      answer: "Acta.ai uses 256-bit AES encryption for data at rest and 256-bit SSL/TLS encryption for data in transit. All data is stored in secure, SOC 2 compliant data centers with multiple layers of security protection.",
+      question: "What is ActaX and how can it help my team?",
+      answer: "ActaX is an AI-powered meeting intelligence platform that automatically transcribes, summarizes, and extracts actionable insights from your meetings. It helps teams stay organized, track action items, and make meetings more productive.",
     },
     {
-      question: "Who can access our data, and can we control or restrict access ourselves?",
-      answer: "Only authorized personnel within your organization can access your meeting data. Acta.ai provides comprehensive access controls and role-based permissions to help you manage who can view, edit, or share meeting content.",
+      question: "What languages does ActaX support?",
+      answer: "ActaX supports over 50 languages, ensuring that teams can collaborate effectively regardless of their native language. The platform provides real-time translation and multilingual normalization features.",
     },
     {
-      question: "Is Acta.ai compliant with regulations like GDPR, HIPAA, and SOC 2?",
-      answer: "Yes, Acta.ai is fully compliant with GDPR, HIPAA, and SOC 2 Type II standards. We undergo regular security audits and maintain all necessary certifications to ensure your data protection requirements are met.",
+      question: "Can ActaX integrate with my existing tools?",
+      answer: "Yes, ActaX integrates seamlessly with popular tools like Jira, Asana, Trello, Slack, Microsoft Teams, Google Meet, and many others. This allows you to create tasks and tickets directly from meeting discussions.",
     },
     {
-      question: "Does Acta.ai use our meeting data to train AI models? How is privacy maintained?",
-      answer: "No, Acta.ai does not use your meeting data to train AI models. Your data remains private and is only used to provide you with meeting insights and summaries. We maintain strict data privacy protocols.",
-    },
-    {
-      question: "Where is our data stored, and can we choose the storage location?",
-      answer: "Data is stored in secure cloud infrastructure with options for regional data residency. Enterprise customers can choose their preferred data storage location to meet compliance requirements.",
+      question: "How secure is my data with ActaX?",
+      answer: "ActaX takes security seriously. We use AES-256 encryption for data at rest, OAuth 2.0 authentication, and are GDPR compliant and SOC2 certified. Your data is protected with industry-leading security standards.",
     },
   ];
 
@@ -36,15 +32,8 @@ export function FaqSection() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6" data-testid="faq-title">
-            Frequently asked questions
+            Frequently Asked Questions
           </h2>
-          <p className="text-xl text-gray-600" data-testid="faq-subtitle">
-            Can't find the answer you're looking for? Reach out to our{' '}
-            <a href="#" className="text-purple-600 hover:text-purple-700 underline">
-              customer support
-            </a>
-            {' '}team.
-          </p>
         </div>
         
         <div className="space-y-4">

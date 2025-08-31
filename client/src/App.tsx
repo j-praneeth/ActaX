@@ -9,6 +9,13 @@ import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import Dashboard from "@/pages/dashboard";
+import Agents from "@/pages/agents";
+import Integrations from "@/pages/integrations";
+import Settings from "@/pages/settings";
+import MeetingHighlights from "@/pages/meeting-highlights";
+import MeetingAnalytics from "@/pages/meeting-analytics";
+import MeetingTranscript from "@/pages/meeting-transcript";
+import MeetingAgentsPage from "@/pages/meeting-agents";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,6 +25,13 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/agents" component={Agents} />
+      <Route path="/integrations" component={Integrations} />
+      <Route path="/settings" component={Settings} />
+      <Route path="/meeting/:id/highlights" component={MeetingHighlights} />
+      <Route path="/meeting/:id/analytics" component={MeetingAnalytics} />
+      <Route path="/meeting/:id/transcript" component={MeetingTranscript} />
+      <Route path="/meeting/:id/agents" component={MeetingAgentsPage} />
       <Route component={NotFound} />
     </Switch>
   );

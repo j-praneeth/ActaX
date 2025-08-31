@@ -10,7 +10,7 @@
   --card-foreground: hsl(222.2 84% 4.9%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(222.2 84% 4.9%);
-  --primary: hsl(262.1 83.3% 57.8%);
+  --primary: hsl(213 88% 60%);
   --primary-foreground: hsl(210 40% 98%);
   --secondary: hsl(210 40% 96%);
   --secondary-foreground: hsl(222.2 84% 4.9%);
@@ -22,34 +22,32 @@
   --destructive-foreground: hsl(210 40% 98%);
   --border: hsl(214.3 31.8% 91.4%);
   --input: hsl(214.3 31.8% 91.4%);
-  --ring: hsl(262.1 83.3% 57.8%);
-  --chart-1: hsl(262.1 83.3% 57.8%);
+  --ring: hsl(213 88% 60%);
+  --chart-1: hsl(213 88% 60%);
   --chart-2: hsl(159.7826 100% 36.0784%);
   --chart-3: hsl(42.0290 92.8251% 56.2745%);
   --chart-4: hsl(147.1429 78.5047% 41.9608%);
   --chart-5: hsl(341.4894 75.2000% 50.9804%);
   --sidebar: hsl(180 6.6667% 97.0588%);
   --sidebar-foreground: hsl(210 25% 7.8431%);
-  --sidebar-primary: hsl(262.1 83.3% 57.8%);
+  --sidebar-primary: hsl(213 88% 60%);
   --sidebar-primary-foreground: hsl(210 40% 98%);
   --sidebar-accent: hsl(210 40% 96%);
-  --sidebar-accent-foreground: hsl(262.1 83.3% 57.8%);
+  --sidebar-accent-foreground: hsl(213 88% 60%);
   --sidebar-border: hsl(205.0000 25.0000% 90.5882%);
-  --sidebar-ring: hsl(262.1 83.3% 57.8%);
+  --sidebar-ring: hsl(213 88% 60%);
   --font-sans: 'Inter', sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
   --radius: 0.75rem;
   
-  /* Custom colors for Acta theme */
+  /* Custom colors for ActaX theme */
   --hero-gradient: linear-gradient(135deg, hsl(225 39% 15%) 0%, hsl(220 38% 20%) 50%, hsl(215 28% 25%) 100%);
-  --primary-gradient: linear-gradient(135deg, hsl(262.1 83.3% 57.8%) 0%, hsl(213 88% 60%) 100%);
-  --purple-50: hsl(270 100% 98%);
-  --purple-100: hsl(269 100% 95%);
-  --purple-600: hsl(262.1 83.3% 57.8%);
+  --primary-gradient: linear-gradient(135deg, hsl(213 88% 60%) 0%, hsl(213 88% 60%) 100%);
   --blue-50: hsl(214 100% 97%);
   --blue-100: hsl(214 95% 93%);
   --blue-600: hsl(213 88% 60%);
+  --blue-700: hsl(213 88% 50%);
 }
 
 .dark {

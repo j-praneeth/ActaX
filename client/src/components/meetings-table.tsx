@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Edit, Trash2, Search, Video } from "lucide-react";
+import { Edit, Trash2, Search, Video, Eye } from "lucide-react";
 import { Link } from "wouter";
 import type { Meeting } from "@shared/schema";
 
@@ -10,9 +10,10 @@ interface MeetingsTableProps {
   meetings: Meeting[];
   onEdit: (meeting: Meeting) => void;
   onDelete: (meetingId: string) => void;
+  onView?: (meeting: Meeting) => void;
 }
 
-export function MeetingsTable({ meetings, onEdit, onDelete }: MeetingsTableProps) {
+export function MeetingsTable({ meetings, onEdit, onDelete, onView }: MeetingsTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const filteredMeetings = useMemo(() => {
     return (meetings || []).filter((meeting) => {
@@ -68,6 +69,16 @@ export function MeetingsTable({ meetings, onEdit, onDelete }: MeetingsTableProps
                   <td className="py-3 px-2">{meeting.endTime ? new Date(meeting.endTime).toLocaleString() : '-'}</td>
                   <td className="py-3 px-2">
                     <div className="flex space-x-2">
+                      {onView && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onView(meeting)}
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

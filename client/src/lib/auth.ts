@@ -48,17 +48,67 @@ export const authService = {
     };
   },
 
+  async signInWithGoogle(): Promise<void> {
+    try {
+      const response = await fetch('/api/auth/google');
+      const { authUrl } = await response.json();
+      
+      if (!response.ok) {
+        throw new Error('Failed to get Google auth URL');
+      }
+      
+      // Redirect to Google OAuth
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Google sign in error:', error);
+      throw error;
+    }
+  },
+
+  async signInWithToken(token: string): Promise<AuthUser> {
+    try {
+      const response = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Token verification failed');
+      }
+
+      const { user } = await response.json();
+      return user;
+    } catch (error) {
+      console.error('Token sign in error:', error);
+      throw error;
+    }
+  },
+
   async signOut(): Promise<void> {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    // Clear any stored tokens
+    localStorage.removeItem('auth_token');
+    window.location.href = '/';
   },
 
   async getCurrentUser(): Promise<AuthUser | null> {
-    // First check if there's a valid session
+    // Check for stored token first
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        return await this.signInWithToken(token);
+      } catch (error) {
+        // Token is invalid, remove it
+        localStorage.removeItem('auth_token');
+      }
+    }
+
+    // Fallback to Supabase session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
-      // If there's a session error, it might be a missing session - that's okay
       console.warn('Session error:', sessionError);
       return null;
     }

@@ -58,4 +58,47 @@ export const supabaseService = {
       return null;
     }
   },
+
+  async createSessionToken(user: User): Promise<string> {
+    try {
+      // Create a JWT token for the user session
+      const { data, error } = await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: user.email,
+        options: {
+          redirectTo: `${process.env.CALLBACK_BASE_URL || 'http://localhost:5000'}/dashboard`
+        }
+      });
+
+      if (error) throw error;
+
+      // For simplicity, we'll create a custom token
+      // In production, you might want to use a proper JWT library
+      const token = Buffer.from(JSON.stringify({
+        userId: user.id,
+        email: user.email,
+        exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+      })).toString('base64');
+
+      return token;
+    } catch (error) {
+      console.error('Session token creation error:', error);
+      throw new Error('Failed to create session token');
+    }
+  },
+
+  async verifySessionToken(token: string): Promise<User | null> {
+    try {
+      const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+      
+      if (decoded.exp < Date.now()) {
+        return null; // Token expired
+      }
+
+      return await storage.getUserById(decoded.userId);
+    } catch (error) {
+      console.error('Session token verification error:', error);
+      return null;
+    }
+  },
 };

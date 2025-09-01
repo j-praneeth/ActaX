@@ -81,6 +81,23 @@ class OAuthService {
       scopes: [],
       redirectUri: `${baseRedirectUri}/api/integrations/callback`,
     });
+
+    // Google OAuth Config
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    
+    if (googleClientId && googleClientSecret) {
+      this.configs.set("google", {
+        clientId: googleClientId,
+        clientSecret: googleClientSecret,
+        authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+        tokenUrl: "https://oauth2.googleapis.com/token",
+        scopes: ["openid", "email", "profile", "https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/meetings.space.created"],
+        redirectUri: `${baseRedirectUri}/api/auth/google/callback`,
+      });
+    } else {
+      console.warn('Google OAuth not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
+    }
   }
 
   async getAuthUrl(provider: string, organizationId: string): Promise<string> {
@@ -271,30 +288,168 @@ class OAuthService {
   }
 
   private async syncToJira(meeting: Meeting, accessToken: string): Promise<void> {
-    // Create Jira issues from action items
-    if (!meeting.actionItems || !Array.isArray(meeting.actionItems)) return;
-
-    for (const actionItem of meeting.actionItems) {
-      try {
-        await fetch("https://api.atlassian.com/ex/jira/v1/issue", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fields: {
-              project: { key: "MEET" }, // This would be configurable
-              summary: actionItem,
-              description: `Action item from meeting: ${meeting.title}`,
-              issuetype: { name: "Task" },
-            },
-          }),
-        });
-      } catch (error) {
-        console.error("Failed to create Jira issue:", error);
+    try {
+      // First, get the cloud ID for the Jira instance
+      const cloudId = await this.getJiraCloudId(accessToken);
+      if (!cloudId) {
+        console.error("Failed to get Jira cloud ID");
+        return;
       }
+
+      // Create a main meeting summary issue
+      const summaryIssue = await this.createJiraIssue(cloudId, accessToken, {
+        summary: `Meeting Summary: ${meeting.title}`,
+        description: this.generateJiraDescription(meeting),
+        issuetype: "Story",
+        priority: "Medium"
+      });
+
+      // Create action item issues and link them to the summary
+      if (meeting.actionItems && Array.isArray(meeting.actionItems)) {
+        for (const actionItem of meeting.actionItems) {
+          try {
+            const actionIssue = await this.createJiraIssue(cloudId, accessToken, {
+              summary: actionItem,
+              description: `Action item from meeting: ${meeting.title}\n\nMeeting Date: ${meeting.startTime ? new Date(meeting.startTime).toLocaleDateString() : 'N/A'}`,
+              issuetype: "Task",
+              priority: "High"
+            });
+
+            // Link the action item to the summary issue
+            if (summaryIssue && actionIssue) {
+              await this.linkJiraIssues(cloudId, accessToken, summaryIssue.key, actionIssue.key, "relates to");
+            }
+          } catch (error) {
+            console.error("Failed to create Jira action item issue:", error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to sync meeting to Jira:", error);
     }
+  }
+
+  private async getJiraCloudId(accessToken: string): Promise<string | null> {
+    try {
+      const response = await fetch("https://api.atlassian.com/oauth/token/accessible-resources", {
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Accept": "application/json",
+        },
+      });
+
+      if (!response.ok) return null;
+
+      const resources = await response.json();
+      return resources[0]?.id || null;
+    } catch (error) {
+      console.error("Failed to get Jira cloud ID:", error);
+      return null;
+    }
+  }
+
+  private async createJiraIssue(cloudId: string, accessToken: string, issueData: {
+    summary: string;
+    description: string;
+    issuetype: string;
+    priority: string;
+  }): Promise<{ key: string } | null> {
+    try {
+      const response = await fetch(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/issue`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fields: {
+            project: { key: "MEET" }, // This would be configurable
+            summary: issueData.summary,
+            description: {
+              type: "doc",
+              version: 1,
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    {
+                      type: "text",
+                      text: issueData.description
+                    }
+                  ]
+                }
+              ]
+            },
+            issuetype: { name: issueData.issuetype },
+            priority: { name: issueData.priority },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        console.error(`Jira API error: ${response.status} ${response.statusText}`);
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Failed to create Jira issue:", error);
+      return null;
+    }
+  }
+
+  private async linkJiraIssues(cloudId: string, accessToken: string, inwardIssue: string, outwardIssue: string, linkType: string): Promise<void> {
+    try {
+      await fetch(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/issueLink`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: { name: linkType },
+          inwardIssue: { key: inwardIssue },
+          outwardIssue: { key: outwardIssue },
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to link Jira issues:", error);
+    }
+  }
+
+  private generateJiraDescription(meeting: Meeting): string {
+    const actionItemsText = Array.isArray(meeting.actionItems) 
+      ? meeting.actionItems.map((item: string) => `• ${item}`).join("\n")
+      : "No action items";
+    
+    const keyTopicsText = Array.isArray(meeting.keyTopics)
+      ? meeting.keyTopics.map((topic: string) => `• ${topic}`).join("\n")
+      : "No key topics";
+    
+    const decisionsText = Array.isArray(meeting.decisions)
+      ? meeting.decisions.map((decision: string) => `• ${decision}`).join("\n")
+      : "No decisions recorded";
+
+    return `Meeting Summary: ${meeting.title}
+
+📝 Summary:
+${meeting.summary || "No summary available"}
+
+✅ Action Items:
+${actionItemsText}
+
+🔑 Key Topics:
+${keyTopicsText}
+
+📋 Decisions:
+${decisionsText}
+
+📊 Sentiment: ${meeting.sentiment || "Not analyzed"}
+
+Meeting Date: ${meeting.startTime ? new Date(meeting.startTime).toLocaleDateString() : 'N/A'}
+Duration: ${meeting.startTime && meeting.endTime ? 
+  Math.round((new Date(meeting.endTime).getTime() - new Date(meeting.startTime).getTime()) / (1000 * 60)) + ' minutes' : 
+  'Unknown'}`;
   }
 
   private async syncToLinear(meeting: Meeting, accessToken: string): Promise<void> {

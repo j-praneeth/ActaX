@@ -17,6 +17,7 @@ import { randomUUID } from "crypto";
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User>;
@@ -59,6 +60,10 @@ export class MemStorage implements IStorage {
 
   // Users
   async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
     return this.users.get(id);
   }
 
@@ -260,7 +265,19 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Use Supabase storage if DATABASE_URL is available, otherwise fall back to in-memory storage
+const useSupabase = !!process.env.DATABASE_URL;
+
+let storage: IStorage;
+if (useSupabase) {
+  // Dynamic import to avoid issues when DATABASE_URL is not set
+  const { SupabaseStorage } = await import('./supabase-storage');
+  storage = new SupabaseStorage();
+} else {
+  storage = new MemStorage();
+}
+
+export { storage };
 
 // Initialize with sample data for demonstration
 async function initSampleData() {

@@ -9,6 +9,9 @@ import { AudioRecorder } from "@/components/meeting/AudioRecorder";
 import { PlusMenu } from "@/components/plus-menu";
 import { UploadAudio } from "@/components/upload-audio";
 import { MeetingsTable } from "@/components/meetings-table";
+import { MeetingCreationModal } from "@/components/meeting-creation-modal";
+import { MeetingDetailsCard } from "@/components/meeting-details-card";
+import { IntegrationsPanel } from "@/components/integrations-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +26,7 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
 
   const { data: meetings = [], isLoading, refetch } = useQuery<Meeting[]>({
     queryKey: ["/api/meetings"],
@@ -108,14 +112,87 @@ export default function Dashboard() {
 
             
 
-            {/* My Meetings Table */}
-            <div className="mb-8">
-              <MeetingsTable
-                meetings={filteredMeetings}
-                onEdit={handleEditMeeting}
-                onDelete={handleDeleteMeeting}
-              />
-            </div>
+            {/* Main Content Tabs */}
+            <Tabs defaultValue="meetings" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="meetings">Meetings</TabsTrigger>
+                <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="meetings" className="space-y-6">
+                {/* Search and Create */}
+                <div className="flex items-center justify-between">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      placeholder="Search meetings..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <MeetingCreationModal onMeetingCreated={refetch} />
+                </div>
+
+                {/* Meeting Details or Table */}
+                {selectedMeeting ? (
+                  <div className="space-y-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setSelectedMeeting(null)}
+                      className="mb-4"
+                    >
+                      ← Back to Meetings
+                    </Button>
+                    <MeetingDetailsCard 
+                      meeting={selectedMeeting} 
+                      onSync={() => refetch()}
+                    />
+                  </div>
+                ) : (
+                  <MeetingsTable
+                    meetings={filteredMeetings}
+                    onEdit={handleEditMeeting}
+                    onDelete={handleDeleteMeeting}
+                    onView={(meeting) => setSelectedMeeting(meeting)}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="integrations">
+                <IntegrationsPanel onIntegrationAdded={() => refetch()} />
+              </TabsContent>
+
+              <TabsContent value="analytics">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Total Meetings</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{meetings.length}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{completedMeetings.length}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{scheduledMeetings.length}</div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>

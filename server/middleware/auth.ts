@@ -20,7 +20,7 @@ export async function authMiddleware(
     }
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
-    const user = await supabaseService.verifyAuthToken(token);
+    const user = await supabaseService.verifySessionToken(token);
 
     if (!user) {
       res.status(401).json({ message: "Invalid authentication token" });

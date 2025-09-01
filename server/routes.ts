@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { supabaseService } from "./services/supabase";
 import { recallAIService } from "./services/recall-ai";
 import { oauthService } from "./services/oauth";
+import { googleAuthService } from "./services/google-auth";
 import { authMiddleware, type AuthenticatedRequest } from "./middleware/auth";
 import { insertMeetingSchema, insertIntegrationSchema, insertWebhookEventSchema, insertAgentSchema } from "@shared/schema";
 import { z } from "zod";
@@ -17,7 +18,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Token required" });
       }
 
-      const user = await supabaseService.verifyAuthToken(token);
+      const user = await supabaseService.verifySessionToken(token);
       if (!user) {
         return res.status(401).json({ message: "Invalid token" });
       }
@@ -26,6 +27,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Auth verification error:", error);
       res.status(500).json({ message: "Authentication failed" });
+    }
+  });
+
+            // Google OAuth routes
+          app.get("/api/auth/google", async (req, res) => {
+            try {
+              const authUrl = googleAuthService.getAuthUrl();
+              res.json({ authUrl });
+            } catch (error) {
+              console.error("Google OAuth error:", error);
+              if (error instanceof Error && error.message.includes('Missing required Google OAuth environment variables')) {
+                res.status(500).json({ 
+                  message: "Google OAuth not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables." 
+                });
+              } else {
+                res.status(500).json({ message: "Failed to initiate Google OAuth" });
+              }
+            }
+          });
+
+  app.get("/api/auth/google/callback", async (req, res) => {
+    try {
+      const { code, error } = req.query;
+      
+      if (error) {
+        console.error("Google OAuth error:", error);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
+        return res.redirect(`${frontendUrl}/login?error=oauth_error`);
+      }
+      
+      if (!code || typeof code !== 'string') {
+        console.error("No authorization code received");
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
+        return res.redirect(`${frontendUrl}/login?error=no_code`);
+      }
+
+      console.log("Received authorization code:", code.substring(0, 20) + "...");
+      
+      const { user, token } = await googleAuthService.handleCallback(code);
+      
+      console.log("User authenticated:", user.email);
+      
+      // Redirect to frontend with token
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
+      res.redirect(`${frontendUrl}/dashboard?token=${token}`);
+    } catch (error) {
+      console.error("Google OAuth callback error:", error);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
+      res.redirect(`${frontendUrl}/login?error=callback_failed`);
     }
   });
 
@@ -230,10 +280,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process the webhook
       await recallAIService.processWebhook(webhookEvent);
 
+      // If meeting is completed, sync to integrations
+      if (event.eventType === "transcript.ready" && event.meetingId) {
+        const meeting = await storage.getMeeting(event.meetingId);
+        if (meeting && meeting.status === "completed") {
+          // Sync to Jira if integration exists
+          await oauthService.syncMeetingToIntegration(meeting, "jira");
+        }
+      }
+
       res.json({ success: true });
     } catch (error) {
       console.error("Webhook processing error:", error);
       res.status(500).json({ message: "Webhook processing failed" });
+    }
+  });
+
+  // Manual sync route
+  app.post("/api/meetings/:id/sync", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const meeting = await storage.getMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+
+      // Check if user has access to this meeting
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { provider } = req.body;
+      if (!provider) {
+        return res.status(400).json({ message: "Provider required" });
+      }
+
+      await oauthService.syncMeetingToIntegration(meeting, provider);
+      res.json({ success: true, message: `Meeting synced to ${provider}` });
+    } catch (error) {
+      console.error("Meeting sync error:", error);
+      res.status(500).json({ message: "Failed to sync meeting" });
     }
   });
 

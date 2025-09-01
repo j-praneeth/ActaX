@@ -5,32 +5,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Play, Pause, SkipBack, SkipForward, Download } from "lucide-react";
+import { useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { Meeting } from "@shared/schema";
 
 export default function MeetingTranscript() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(9);
   const [totalTime] = useState(19);
-
-  const transcriptEntries = [
-    {
-      id: 1,
-      speaker: "Naveen Bandari",
-      timestamp: "00:19",
-      text: "Naveen highlighted that he has consistently been recognized for academic excellence, demonstrating a strong commitment to learning and professional development throughout his career."
-    },
-    {
-      id: 2,
-      speaker: "Naveen Bandari", 
-      timestamp: "00:19",
-      text: "Naveen highlighted that he has consistently been recognized for academic excellence, demonstrating a strong commitment to learning and professional development throughout his career."
-    },
-    {
-      id: 3,
-      speaker: "Naveen Bandari",
-      timestamp: "00:19", 
-      text: "Naveen highlighted that he has consistently been recognized for academic excellence, demonstrating a strong commitment to learning and professional development throughout his career."
-    }
-  ];
+  const params = useParams<{ id: string }>();
+  const { data: meeting } = useQuery<Meeting | null>({
+    queryKey: ["/api/meetings", params.id],
+    enabled: !!params?.id,
+  });
 
   const handlePlayPause = () => {
     setIsPlaying(!isPlaying);
@@ -68,28 +55,13 @@ export default function MeetingTranscript() {
 
             {/* Transcript List */}
             <div className="space-y-4 mb-8">
-              {transcriptEntries.map((entry) => (
-                <Card key={entry.id} className="bg-gray-50">
-                  <CardContent className="p-4">
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                          <span className="text-white text-sm font-semibold">
-                            {entry.speaker.split(' ').map(n => n[0]).join('')}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className="font-semibold text-gray-900">{entry.speaker}</span>
-                          <span className="text-sm text-gray-500">{entry.timestamp}</span>
-                        </div>
-                        <p className="text-gray-700">{entry.text}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              <Card className="bg-gray-50">
+                <CardContent className="p-4">
+                  <p className="text-gray-700 whitespace-pre-wrap">
+                    {meeting?.transcript || 'No transcript available.'}
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>

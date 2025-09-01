@@ -1,29 +1,25 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Edit, Trash2, Search, Video } from "lucide-react";
-
-interface Meeting {
-  id: number;
-  subject: string;
-  platform: string;
-  date: string;
-  startTime: string;
-}
+import { Link } from "wouter";
+import type { Meeting } from "@shared/schema";
 
 interface MeetingsTableProps {
   meetings: Meeting[];
   onEdit: (meeting: Meeting) => void;
-  onDelete: (meetingId: number) => void;
+  onDelete: (meetingId: string) => void;
 }
 
 export function MeetingsTable({ meetings, onEdit, onDelete }: MeetingsTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
-
-  const filteredMeetings = meetings.filter(meeting =>
-    meeting.subject.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMeetings = useMemo(() => {
+    return (meetings || []).filter((meeting) => {
+      const title = meeting.title || "";
+      return title.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+  }, [meetings, searchTerm]);
 
   return (
     <Card>
@@ -49,11 +45,11 @@ export function MeetingsTable({ meetings, onEdit, onDelete }: MeetingsTableProps
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-3 px-2">#</th>
-                <th className="text-left py-3 px-2">Subject</th>
+                <th className="text-left py-3 px-2">id</th>
+                <th className="text-left py-3 px-2">Title</th>
                 <th className="text-left py-3 px-2">Platform</th>
-                <th className="text-left py-3 px-2">Date</th>
-                <th className="text-left py-3 px-2">Start Time</th>
+                <th className="text-left py-3 px-2">Start</th>
+                <th className="text-left py-3 px-2">End</th>
                 <th className="text-left py-3 px-2">Action</th>
               </tr>
             </thead>
@@ -61,15 +57,15 @@ export function MeetingsTable({ meetings, onEdit, onDelete }: MeetingsTableProps
               {filteredMeetings.map((meeting) => (
                 <tr key={meeting.id} className="border-b hover:bg-gray-50">
                   <td className="py-3 px-2">{meeting.id}</td>
-                  <td className="py-3 px-2 font-medium">{meeting.subject}</td>
+                  <td className="py-3 px-2 font-medium"><Link href={`/meeting/${meeting.id}/highlights`}>{meeting.title}</Link></td>
                   <td className="py-3 px-2">
                     <div className="flex items-center space-x-2">
                       <Video className="h-4 w-4 text-green-500" />
-                      <span>{meeting.platform}</span>
+                      <span>{meeting.platform || '-'}</span>
                     </div>
                   </td>
-                  <td className="py-3 px-2">{meeting.date}</td>
-                  <td className="py-3 px-2">{meeting.startTime}</td>
+                  <td className="py-3 px-2">{meeting.startTime ? new Date(meeting.startTime).toLocaleString() : '-'}</td>
+                  <td className="py-3 px-2">{meeting.endTime ? new Date(meeting.endTime).toLocaleString() : '-'}</td>
                   <td className="py-3 px-2">
                     <div className="flex space-x-2">
                       <Button

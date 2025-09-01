@@ -5,7 +5,7 @@ import { supabaseService } from "./services/supabase";
 import { recallAIService } from "./services/recall-ai";
 import { oauthService } from "./services/oauth";
 import { authMiddleware, type AuthenticatedRequest } from "./middleware/auth";
-import { insertMeetingSchema, insertIntegrationSchema, insertWebhookEventSchema } from "@shared/schema";
+import { insertMeetingSchema, insertIntegrationSchema, insertWebhookEventSchema, insertAgentSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -83,6 +83,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Optional delete route for completeness used by UI later
+  app.delete("/api/meetings/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const meeting = await storage.getMeeting(req.params.id);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+      // For in-memory store, just update status to failed as soft-delete example (real impl would delete)
+      const updated = await storage.updateMeeting(req.params.id, { status: "failed" as any });
+      res.json(updated);
+    } catch (error) {
+      console.error("Delete meeting error:", error);
+      res.status(500).json({ message: "Failed to delete meeting" });
+    }
+  });
+
   app.get("/api/meetings/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const meeting = await storage.getMeeting(req.params.id);
@@ -129,6 +145,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get integrations error:", error);
       res.status(500).json({ message: "Failed to fetch integrations" });
+    }
+  });
+
+  // Agents routes
+  app.get("/api/agents", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      if (organizations.length === 0) return res.json([]);
+      const agents = await storage.getAgentsByOrganization(organizations[0].id);
+      res.json(agents);
+    } catch (error) {
+      console.error("Get agents error:", error);
+      res.status(500).json({ message: "Failed to fetch agents" });
+    }
+  });
+
+  app.post("/api/agents", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      if (organizations.length === 0) return res.status(400).json({ message: "No organization found" });
+      const agentData = insertAgentSchema.parse({
+        ...req.body,
+        organizationId: organizations[0].id,
+      });
+      const agent = await storage.createAgent(agentData);
+      res.json(agent);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid agent data", errors: error.errors });
+      }
+      console.error("Create agent error:", error);
+      res.status(500).json({ message: "Failed to create agent" });
     }
   });
 

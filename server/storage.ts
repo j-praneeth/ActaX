@@ -7,6 +7,8 @@ import {
   type InsertMeeting,
   type Integration,
   type InsertIntegration,
+  type Agent,
+  type InsertAgent,
   type WebhookEvent,
   type InsertWebhookEvent
 } from "@shared/schema";
@@ -35,6 +37,11 @@ export interface IStorage {
   getIntegrationByProvider(organizationId: string, provider: string): Promise<Integration | undefined>;
   createIntegration(integration: InsertIntegration): Promise<Integration>;
   updateIntegration(id: string, updates: Partial<Integration>): Promise<Integration>;
+
+  // Agents
+  getAgentsByOrganization(organizationId: string): Promise<Agent[]>;
+  createAgent(agent: InsertAgent): Promise<Agent>;
+  updateAgent(id: string, updates: Partial<Agent>): Promise<Agent>;
   
   // Webhook Events
   createWebhookEvent(event: InsertWebhookEvent): Promise<WebhookEvent>;
@@ -47,6 +54,7 @@ export class MemStorage implements IStorage {
   private organizations: Map<string, Organization> = new Map();
   private meetings: Map<string, Meeting> = new Map();
   private integrations: Map<string, Integration> = new Map();
+  private agents: Map<string, Agent> = new Map();
   private webhookEvents: Map<string, WebhookEvent> = new Map();
 
   // Users
@@ -198,6 +206,33 @@ export class MemStorage implements IStorage {
     return updatedIntegration;
   }
 
+  // Agents
+  async getAgentsByOrganization(organizationId: string): Promise<Agent[]> {
+    return Array.from(this.agents.values()).filter(agent => agent.organizationId === organizationId);
+  }
+
+  async createAgent(insertAgent: InsertAgent): Promise<Agent> {
+    const id = randomUUID();
+    const now = new Date();
+    const agent: Agent = {
+      ...insertAgent,
+      id,
+      goal: insertAgent.goal || null,
+      createdAt: now,
+      updatedAt: now,
+    } as Agent;
+    this.agents.set(id, agent);
+    return agent;
+  }
+
+  async updateAgent(id: string, updates: Partial<Agent>): Promise<Agent> {
+    const agent = this.agents.get(id);
+    if (!agent) throw new Error("Agent not found");
+    const updated = { ...agent, ...updates, updatedAt: new Date() } as Agent;
+    this.agents.set(id, updated);
+    return updated;
+  }
+
   // Webhook Events
   async createWebhookEvent(insertEvent: InsertWebhookEvent): Promise<WebhookEvent> {
     const id = randomUUID();
@@ -320,6 +355,18 @@ async function initSampleData() {
     for (const meetingData of meetings) {
       await storage.createMeeting(meetingData);
     }
+
+    // Sample agents
+    await storage.createAgent({
+      organizationId: sampleOrg.id,
+      name: "Product Assistant - Ticket Creator",
+      goal: "Identifies potential new Jira tickets from meetings.",
+    });
+    await storage.createAgent({
+      organizationId: sampleOrg.id,
+      name: "Product Manager Agent",
+      goal: "Generates PRDs from meeting discussions.",
+    });
 
     console.log("Sample data initialized successfully");
   } catch (error) {

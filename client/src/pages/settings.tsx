@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Key } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Settings() {
+  const { user } = useAuth();
   const [autoJoinMeetings, setAutoJoinMeetings] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -26,6 +28,9 @@ export default function Settings() {
             {/* Header */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
+              {user && (
+                <p className="text-gray-600">Signed in as {user.name || 'User'} ({user.email})</p>
+              )}
             </div>
 
             <div className="space-y-8">
@@ -88,7 +93,7 @@ export default function Settings() {
                       <Input
                         id="email"
                         type="email"
-                        defaultValue="user@actax.com"
+                        defaultValue={user?.email || ''}
                         className="max-w-md"
                       />
                     </div>

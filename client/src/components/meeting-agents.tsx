@@ -20,7 +20,7 @@ export function MeetingAgents({ hasAgents = false }: MeetingAgentsProps) {
             <p className="text-gray-600 mb-8 max-w-md">
               No agent summaries are currently available for this meeting. You can enable agents in your settings to view their insights here.
             </p>
-            <Link href="/settings">
+            <Link href="/agents">
               <Button className="bg-blue-600 hover:bg-blue-700">
                 <Settings className="h-4 w-4 mr-2" />
                 Go to Agents Page

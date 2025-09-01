@@ -56,6 +56,15 @@ export const integrations = pgTable("integrations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const agents = pgTable("agents", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: uuid("organization_id").references(() => organizations.id).notNull(),
+  name: text("name").notNull(),
+  goal: text("goal"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const webhookEvents = pgTable("webhook_events", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   source: text("source").notNull(), // recall_ai
@@ -91,6 +100,12 @@ export const insertIntegrationSchema = createInsertSchema(integrations).omit({
   updatedAt: true,
 });
 
+export const insertAgentSchema = createInsertSchema(agents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertWebhookEventSchema = createInsertSchema(webhookEvents).omit({
   id: true,
   createdAt: true,
@@ -107,3 +122,5 @@ export type Integration = typeof integrations.$inferSelect;
 export type InsertIntegration = z.infer<typeof insertIntegrationSchema>;
 export type WebhookEvent = typeof webhookEvents.$inferSelect;
 export type InsertWebhookEvent = z.infer<typeof insertWebhookEventSchema>;
+export type Agent = typeof agents.$inferSelect;
+export type InsertAgent = z.infer<typeof insertAgentSchema>;

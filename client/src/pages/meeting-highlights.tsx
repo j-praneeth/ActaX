@@ -3,57 +3,17 @@ import { MeetingSidebar } from "@/components/meeting-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Edit, Trash2, Send, User } from "lucide-react";
+import { Edit, Trash2, Send } from "lucide-react";
+import { useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { Meeting } from "@shared/schema";
 
 export default function MeetingHighlights() {
-  const actionPoints = [
-    {
-      id: 1,
-      point: "Naveen Bandari to provide a detailed report on the company's current operations and response to Covid-19.",
-      owner: "Naveen Bandari"
-    },
-    {
-      id: 2,
-      point: "Establish a regular update schedule for Covid-19 related information sharing within the team.",
-      owner: "Naveen Bandari"
-    }
-  ];
-
-  const topics = [
-    {
-      id: 1,
-      topic: "Company's Response to Covid-19",
-      description: "Discussion focused on how the company is handling the ongoing Covid-19 situation, including operational adjustments and monitoring.",
-      speaker: "Naveen Bandari"
-    }
-  ];
-
-  const keyTakeaways = [
-    {
-      id: 1,
-      text: "The company is actively monitoring the situation regarding Covid-19."
-    },
-    {
-      id: 2,
-      text: "There is a need for continuous updates and information sharing related to Covid-19 developments."
-    }
-  ];
-
-  const participants = [
-    {
-      id: 1,
-      name: "Naveen Bandari",
-      initials: "NB"
-    }
-  ];
-
-  const predefinedQuestions = [
-    "What is meant by 'a little companyaz' in the transcript?",
-    "What are the 'watch screens' referred to in the transcript, and what is their significance?",
-    "Who or what does 'the pa' refer to, and what is it supposed to discover?",
-    "Is there any context missing from the transcript that could clarify its meaning?",
-    "What is the overall topic or theme of the conversation in the transcript?"
-  ];
+  const params = useParams<{ id: string }>();
+  const { data: meeting } = useQuery<Meeting | null>({
+    queryKey: ["/api/meetings", params.id],
+    enabled: !!params?.id,
+  });
 
   return (
     <div className="min-h-screen bg-white">
@@ -73,9 +33,7 @@ export default function MeetingHighlights() {
                     <CardTitle>Meeting Summary</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-700">
-                      The meeting involved a discussion led by Naveen Bandari regarding the company's activities in relation to Covid-19. There were mentions of company operations and the importance of monitoring developments, although the specifics were not clearly articulated in the transcript.
-                    </p>
+                    <p className="text-gray-700">{meeting?.summary || 'No summary yet.'}</p>
                   </CardContent>
                 </Card>
 
@@ -99,11 +57,11 @@ export default function MeetingHighlights() {
                           </tr>
                         </thead>
                         <tbody>
-                          {actionPoints.map((point) => (
-                            <tr key={point.id} className="border-b">
-                              <td className="py-3">{point.id}</td>
-                              <td className="py-3">{point.point}</td>
-                              <td className="py-3">{point.owner}</td>
+                          {(Array.isArray(meeting?.actionItems) ? meeting?.actionItems : []).map((point: any, idx: number) => (
+                            <tr key={idx} className="border-b">
+                              <td className="py-3">{idx + 1}</td>
+                              <td className="py-3">{point}</td>
+                              <td className="py-3">-</td>
                               <td className="py-3">
                                 <div className="flex space-x-2">
                                   <Button variant="ghost" size="sm">
@@ -143,12 +101,12 @@ export default function MeetingHighlights() {
                           </tr>
                         </thead>
                         <tbody>
-                          {topics.map((topic) => (
-                            <tr key={topic.id} className="border-b">
-                              <td className="py-3">{topic.id}</td>
-                              <td className="py-3">{topic.topic}</td>
-                              <td className="py-3">{topic.description}</td>
-                              <td className="py-3">{topic.speaker}</td>
+                          {(Array.isArray(meeting?.keyTopics) ? meeting?.keyTopics : []).map((topic: any, idx: number) => (
+                            <tr key={idx} className="border-b">
+                              <td className="py-3">{idx + 1}</td>
+                              <td className="py-3">{topic}</td>
+                              <td className="py-3">-</td>
+                              <td className="py-3">-</td>
                               <td className="py-3">
                                 <div className="flex space-x-2">
                                   <Button variant="ghost" size="sm">
@@ -186,10 +144,10 @@ export default function MeetingHighlights() {
                           </tr>
                         </thead>
                         <tbody>
-                          {keyTakeaways.map((takeaway) => (
-                            <tr key={takeaway.id} className="border-b">
-                              <td className="py-3">{takeaway.id}</td>
-                              <td className="py-3">{takeaway.text}</td>
+                          {(Array.isArray(meeting?.takeaways) ? meeting?.takeaways : []).map((text: any, idx: number) => (
+                            <tr key={idx} className="border-b">
+                              <td className="py-3">{idx + 1}</td>
+                              <td className="py-3">{text}</td>
                               <td className="py-3">
                                 <div className="flex space-x-2">
                                   <Button variant="ghost" size="sm">
@@ -211,25 +169,15 @@ export default function MeetingHighlights() {
 
               {/* Right Column - Sidebar */}
               <div className="space-y-6">
-                {/* Participants */}
+                {/* Participants - dynamic when available */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span>Participants ({participants.length})</span>
-                      <Button variant="link" size="sm">View All</Button>
+                      <span>Participants</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      {participants.map((participant) => (
-                        <div key={participant.id} className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                            <span className="text-white text-sm font-semibold">{participant.initials}</span>
-                          </div>
-                          <span className="text-gray-700">{participant.name}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <div className="text-sm text-gray-600">Participants data not available.</div>
                   </CardContent>
                 </Card>
 
@@ -240,7 +188,7 @@ export default function MeetingHighlights() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {predefinedQuestions.map((question, index) => (
+                      {[(meeting?.title && `What are the next steps for ${meeting.title}?`) || 'What are the next steps?'].map((question, index) => (
                         <div key={index} className="p-3 bg-gray-50 rounded-lg border cursor-pointer hover:bg-gray-100 transition-colors">
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-700">{question}</span>

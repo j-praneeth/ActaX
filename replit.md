@@ -73,3 +73,10 @@ Preferred communication style: Simple, everyday language.
 - **React Hook Form**: Form handling with Zod validation
 - **Date-fns**: Date manipulation and formatting
 - **Class Variance Authority**: Component variant management
+
+## Database Migrations
+
+- Drizzle schema is defined in `shared/schema.ts`. Ensure `DATABASE_URL` is set.
+- Run:
+  - `npx drizzle-kit generate`
+  - `npx drizzle-kit push`

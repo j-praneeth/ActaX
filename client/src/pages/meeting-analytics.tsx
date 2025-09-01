@@ -2,51 +2,26 @@ import { Header } from "@/components/header";
 import { MeetingSidebar } from "@/components/meeting-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, CheckSquare, Smile, CheckCircle, ArrowRight, Mic } from "lucide-react";
+import { useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { Meeting } from "@shared/schema";
 
 export default function MeetingAnalytics() {
+  const params = useParams<{ id: string }>();
+  const { data: meeting } = useQuery<Meeting | null>({
+    queryKey: ["/api/meetings", params.id],
+    enabled: !!params?.id,
+  });
+
   const analyticsData = [
-    {
-      title: "Meeting Type",
-      content: "Estimate: General Discussion",
-      icon: null
-    },
-    {
-      title: "Smart Tags",
-      content: "No smart tags available.",
-      icon: null,
-      isEmpty: true
-    },
-    {
-      title: "Precise Summary",
-      content: "The main topic seems to be related to a company named 'Covid 1919' and possibly some aspect of 'watch screens' and 'pa' (personal assistant or public announcement). However, the context and significance are unclear due to limited information.",
-      icon: FileText
-    },
-    {
-      title: "Next Action Plan",
-      content: "Estimate: The transcript does not provide enough information to determine a specific next action plan.",
-      icon: CheckSquare
-    },
-    {
-      title: "Sentiment Analysis",
-      content: "Estimate: Neutral. The provided text is too limited to assess any sentiment accurately.",
-      icon: Smile
-    },
-    {
-      title: "Decisions Made",
-      content: "No decisions can be extracted from the provided text.",
-      icon: CheckCircle
-    },
-    {
-      title: "Follow-ups",
-      content: "No follow-up actions can be identified from the provided text.",
-      icon: ArrowRight
-    },
-    {
-      title: "Speaker Analytics",
-      content: "Naveen Bandari",
-      icon: Mic,
-      progress: 100
-    }
+    { title: "Meeting Type", content: meeting?.platform || '-', icon: null },
+    { title: "Smart Tags", content: (Array.isArray(meeting?.keyTopics) ? meeting?.keyTopics.join(', ') : '-') || '-', icon: null },
+    { title: "Precise Summary", content: meeting?.summary || 'No summary.', icon: FileText },
+    { title: "Next Action Plan", content: (Array.isArray(meeting?.actionItems) ? meeting?.actionItems.join('; ') : '-') || '-', icon: CheckSquare },
+    { title: "Sentiment Analysis", content: meeting?.sentiment || '-', icon: Smile },
+    { title: "Decisions Made", content: (Array.isArray(meeting?.decisions) ? meeting?.decisions.join('; ') : '-') || '-', icon: CheckCircle },
+    { title: "Follow-ups", content: (Array.isArray(meeting?.takeaways) ? meeting?.takeaways.join('; ') : '-') || '-', icon: ArrowRight },
+    { title: "Speaker Analytics", content: '-', icon: Mic, progress: 0 },
   ];
 
   return (

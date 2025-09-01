@@ -9,12 +9,13 @@ import { useState } from "react";
 export function Header() {
   const { t } = useLanguage();
   const { user, signOut } = useAuth();
-  const [location] = useLocation();
+  const [, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
       await signOut();
+      setLocation("/login");
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -44,17 +45,17 @@ export function Header() {
                   <Globe className="h-4 w-4" />
                   <span>English</span>
                 </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                {/* <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <Clock className="h-4 w-4" />
                   <span>15 Days Left In Trial</span>
-                </div>
+                </div> */}
                 <div className="flex items-center space-x-2">
                   <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
                     <User className="h-4 w-4 text-gray-600" />
                   </div>
                   <div className="text-sm">
-                    <div className="font-medium text-gray-900">Naveen bandari</div>
-                    <div className="text-gray-600">naveenbandari2611@gmail.com</div>
+                    <div className="font-medium text-gray-900">{user.name || 'User'}</div>
+                    <div className="text-gray-600">{user.email}</div>
                   </div>
                 </div>
                 <Button variant="outline" onClick={handleSignOut} data-testid="sign-out-button">
@@ -88,28 +89,6 @@ export function Header() {
         </div>
       </div>
       
-      {/* Mobile Menu Dropdown */}
-      {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-200">
-          <div className="px-4 py-2 space-y-2">
-            <a href="#" className="block py-2 text-gray-600" data-testid="mobile-nav-features">
-              Features
-            </a>
-            <a href="#" className="block py-2 text-gray-600" data-testid="mobile-nav-integrations">
-              Integrations
-            </a>
-            <a href="#" className="block py-2 text-gray-600" data-testid="mobile-nav-pricing">
-              Pricing
-            </a>
-            <a href="#" className="block py-2 text-gray-600" data-testid="mobile-nav-resources">
-              Resources
-            </a>
-            <a href="#" className="block py-2 text-gray-600" data-testid="mobile-nav-contact">
-              Contact
-            </a>
-          </div>
-        </div>
-      )}
     </header>
   );
 }

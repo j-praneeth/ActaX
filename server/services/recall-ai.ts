@@ -1,11 +1,11 @@
 import type { WebhookEvent, Meeting } from "@shared/schema";
 import { storage } from "../storage";
 
-const RECALL_API_KEY = process.env.RECALL_API_KEY || process.env.VITE_RECALL_API_KEY || '32bd623de16c5e9a4520ed8c42085f3f9f9ceccd';
-const RECALL_API_BASE_URL = "https://us-west-2.recall.ai/api/v1";
+const RECALL_API_KEY = process.env.RECALL_API_KEY || process.env.VITE_RECALL_API_KEY;
 
-if (!RECALL_API_KEY || RECALL_API_KEY === "demo_key") {
-  console.warn("⚠️  RECALL_API_KEY not set or using demo key. Bot functionality will be limited.");
+if (!RECALL_API_KEY) {
+  console.error("❌ RECALL_API_KEY environment variable is required. Please set it in your .env file.");
+  console.error("   Get your API key from: https://recall.ai/dashboard");
 }
 
 export interface RecallBot {
@@ -31,15 +31,15 @@ class RecallAIService {
   private baseUrl: string;
 
   constructor() {
-    this.apiKey = RECALL_API_KEY || '32bd623de16c5e9a4520ed8c42085f3f9f9ceccd';
-    this.baseUrl = RECALL_API_BASE_URL;
+    this.apiKey = RECALL_API_KEY;
+    this.baseUrl = "https://us-west-2.recall.ai/api/v1";
   }
 
   async startBot(meetingUrl: string, meetingId: string): Promise<string> {
     try {
       // Check if API key is valid
-      if (!this.apiKey || this.apiKey === "demo_key") {
-        throw new Error("Recall.ai API key not configured. Please set RECALL_API_KEY environment variable.");
+      if (!this.apiKey) {
+        throw new Error("Recall.ai API key not configured. Please set RECALL_API_KEY environment variable in your .env file. Get your API key from: https://recall.ai/dashboard");
       }
 
       console.log(`🤖 Starting Recall.ai bot for meeting: ${meetingUrl}`);
@@ -58,29 +58,7 @@ class RecallAIService {
                 recallai_streaming: {}
               }
             }
-          },
-          // Enhanced bot configuration for better meeting participation
-          bot_name: "Acta AI Assistant",
-          // Bot behavior settings
-          bot_settings: {
-            // Wait in lobby until admitted
-            wait_for_admission: true,
-            // Join as participant (not just observer)
-            join_as_participant: true,
-            // Enable real-time features
-            real_time_features: {
-              live_transcript: true,
-              live_translation: true,
-              speaker_identification: true
-            }
-          },
-          // Webhook configuration for real-time updates
-          webhook_url: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/webhooks/recall`,
-          metadata: {
-            meeting_id: meetingId,
-            bot_type: "transcription_assistant",
-            features: ["real_time_transcript", "english_translation", "lobby_waiting"]
-          },
+          }
         }),
       });
 

@@ -13,6 +13,7 @@ import {
   type InsertWebhookEvent
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import 'dotenv/config';
 
 export interface IStorage {
   // Users
@@ -269,127 +270,28 @@ export class MemStorage implements IStorage {
 const useDatabase = !!process.env.DATABASE_URL;
 
 let storage: IStorage;
-if (useDatabase) {
-  // Dynamic import to avoid issues when DATABASE_URL is not set
-  const { PrismaStorage } = await import('./prisma-storage');
-  storage = new PrismaStorage();
-} else {
-  storage = new MemStorage();
-}
 
-export { storage };
-
-// Initialize with sample data for demonstration
-async function initSampleData() {
-  try {
-    // Create sample user
-    const sampleUser = await storage.createUser({
-      email: "demo@acta.ai",
-      name: "Demo User",
-      role: "owner",
-    });
-
-    // Create sample organization
-    const sampleOrg = await storage.createOrganization({
-      name: "Demo Organization",
-      ownerId: sampleUser.id,
-    });
-
-    // Create sample meetings
-    const meetings = [
-      {
-        title: "Q4 Strategy Planning",
-        description: "Quarterly strategy meeting to discuss goals and objectives",
-        organizationId: sampleOrg.id,
-        status: "completed",
-        platform: "google_meet",
-        startTime: new Date(Date.now() - 86400000), // Yesterday
-        endTime: new Date(Date.now() - 82800000), // Yesterday + 1 hour
-        summary: "Discussed Q4 objectives, budget allocation, and team expansion plans. Key decisions made on product roadmap and resource allocation.",
-        actionItems: [
-          "Finalize Q4 budget by end of week",
-          "Schedule team expansion interviews",
-          "Review product roadmap with engineering",
-          "Prepare board presentation"
-        ],
-        keyTopics: ["Budget", "Hiring", "Product Roadmap", "Board Meeting"],
-        decisions: [
-          "Approved 20% increase in engineering budget",
-          "Decided to hire 3 new developers",
-          "Postponed mobile app launch to Q1"
-        ],
-        takeaways: [
-          "Focus on core product features",
-          "Prioritize customer retention",
-          "Invest in team growth"
-        ],
-        sentiment: "positive"
-      },
-      {
-        title: "Product Demo Session",
-        description: "Demo of new AI features to stakeholders",
-        organizationId: sampleOrg.id,
-        status: "completed",
-        platform: "zoom",
-        startTime: new Date(Date.now() - 172800000), // 2 days ago
-        endTime: new Date(Date.now() - 169200000), // 2 days ago + 1 hour
-        summary: "Showcased new AI-powered meeting insights and integration capabilities. Received positive feedback from stakeholders.",
-        actionItems: [
-          "Incorporate feedback into final design",
-          "Schedule beta testing with key customers",
-          "Prepare launch marketing materials"
-        ],
-        keyTopics: ["AI Features", "User Feedback", "Beta Testing", "Launch Plan"],
-        decisions: [
-          "Approved UI changes based on feedback",
-          "Set beta launch date for next month"
-        ],
-        takeaways: [
-          "AI features exceed expectations",
-          "Strong stakeholder support",
-          "Ready for beta launch"
-        ],
-        sentiment: "positive"
-      },
-      {
-        title: "Weekly Team Standup",
-        description: "Regular team sync and progress updates",
-        organizationId: sampleOrg.id,
-        status: "scheduled",
-        platform: "google_meet",
-        startTime: new Date(Date.now() + 86400000), // Tomorrow
-      },
-      {
-        title: "Client Onboarding Call",
-        description: "Onboarding session with new enterprise client",
-        organizationId: sampleOrg.id,
-        status: "in_progress",
-        platform: "teams",
-        startTime: new Date(), // Now
-      }
-    ];
-
-    for (const meetingData of meetings) {
-      await storage.createMeeting(meetingData);
+// Initialize storage
+async function initStorage() {
+  if (useDatabase) {
+    try {
+      // Import PrismaStorage directly
+      const { PrismaStorage } = await import('./prisma-storage');
+      storage = new PrismaStorage();
+      console.log('✅ Using Prisma storage for database operations');
+    } catch (error) {
+      console.error('❌ Failed to initialize Prisma storage, falling back to in-memory:', error);
+      storage = new MemStorage();
     }
-
-    // Sample agents
-    await storage.createAgent({
-      organizationId: sampleOrg.id,
-      name: "Product Assistant - Ticket Creator",
-      goal: "Identifies potential new Jira tickets from meetings.",
-    });
-    await storage.createAgent({
-      organizationId: sampleOrg.id,
-      name: "Product Manager Agent",
-      goal: "Generates PRDs from meeting discussions.",
-    });
-
-    console.log("Sample data initialized successfully");
-  } catch (error) {
-    console.error("Error initializing sample data:", error);
+  } else {
+    console.log('⚠️  DATABASE_URL not set, using in-memory storage');
+    storage = new MemStorage();
   }
 }
 
-// Initialize sample data
-initSampleData();
+// Initialize storage immediately
+initStorage();
+
+export { storage };
+
+// No sample data initialization - application starts with empty database

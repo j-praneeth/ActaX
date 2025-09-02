@@ -184,14 +184,8 @@ class GoogleMeetService {
    * Starts a recording bot using Recall.ai service or mock service
    */
   private async startRecordingBot(meetingUrl: string, meetingId: string): Promise<string> {
-    try {
-      const { recallAIService } = await import('./recall-ai');
-      return await recallAIService.startBot(meetingUrl, meetingId);
-    } catch (error) {
-      console.log('⚠️  Recall.ai not available, using mock service for development');
-      const { mockRecallAIService } = await import('./mock-recall-ai');
-      return await mockRecallAIService.startBot(meetingUrl, meetingId);
-    }
+    const { recallAIService } = await import('./recall-ai');
+    return await recallAIService.startBot(meetingUrl, meetingId);
   }
 
   /**

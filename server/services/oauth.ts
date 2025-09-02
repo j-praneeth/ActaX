@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import { randomUUID } from "crypto";
 import type { InsertIntegration, Meeting } from "@shared/schema";
+import 'dotenv/config';
 
 interface OAuthConfig {
   clientId: string;

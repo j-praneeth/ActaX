@@ -134,9 +134,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email and name are required" });
       }
 
+      console.log('👤 Creating user:', { email, name, role });
+
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
+        console.log('⚠️  User already exists:', email);
         return res.status(409).json({ message: "User already exists" });
       }
 
@@ -147,7 +150,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: role || 'member',
       };
 
+      console.log('💾 Storing user data:', userData);
       const createdUser = await storage.createUser(userData);
+      console.log('✅ User created successfully with ID:', createdUser.id);
 
       // Create default organization for the user
       const orgData = {
@@ -155,11 +160,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerId: createdUser.id,
       };
       
-      await storage.createOrganization(orgData);
+      console.log('🏢 Creating organization:', orgData);
+      const createdOrg = await storage.createOrganization(orgData);
+      console.log('✅ Organization created successfully with ID:', createdOrg.id);
 
       res.json(createdUser);
     } catch (error) {
-      console.error("Signup error:", error);
+      console.error("❌ Signup error:", error);
       res.status(500).json({ message: "Failed to create user" });
     }
   });
@@ -344,16 +351,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/meetings", authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
+      console.log('📋 Fetching meetings for user:', user.email);
+      
       const organizations = await storage.getOrganizationsByOwner(user.id);
       
       if (organizations.length === 0) {
+        console.log('⚠️  No organization found for user:', user.email);
         return res.json([]);
       }
 
+      console.log('🏢 Fetching meetings for organization:', organizations[0].name);
       const meetings = await storage.getMeetingsByOrganization(organizations[0].id);
+      console.log(`✅ Found ${meetings.length} meetings`);
+      
       res.json(meetings);
     } catch (error) {
-      console.error("Get meetings error:", error);
+      console.error("❌ Get meetings error:", error);
       res.status(500).json({ message: "Failed to fetch meetings" });
     }
   });
@@ -361,35 +374,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/meetings", authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
+      console.log('📝 Creating meeting for user:', user.email);
+      
       const organizations = await storage.getOrganizationsByOwner(user.id);
       
       if (organizations.length === 0) {
+        console.log('❌ No organization found for user:', user.email);
         return res.status(400).json({ message: "No organization found" });
       }
+
+      console.log('🏢 Using organization:', organizations[0].name);
 
       const meetingData = insertMeetingSchema.parse({
         ...req.body,
         organizationId: organizations[0].id,
       });
 
+      console.log('💾 Storing meeting data:', {
+        title: meetingData.title,
+        platform: meetingData.platform,
+        status: meetingData.status,
+        organizationId: meetingData.organizationId
+      });
+
       const meeting = await storage.createMeeting(meetingData);
+      console.log('✅ Meeting created successfully with ID:', meeting.id);
 
       // Start Recall.ai bot if meeting URL is provided
       if (meeting.meetingUrl) {
         try {
+          console.log('🤖 Starting Recall.ai bot for meeting:', meeting.id);
           const botId = await recallAIService.startBot(meeting.meetingUrl, meeting.id);
           await storage.updateMeeting(meeting.id, { recallBotId: botId });
+          console.log('✅ Recall.ai bot started with ID:', botId);
         } catch (error) {
-          console.error("Failed to start Recall.ai bot:", error);
+          console.error("❌ Failed to start Recall.ai bot:", error);
         }
       }
 
       res.json(meeting);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("❌ Validation error:", error.errors);
         return res.status(400).json({ message: "Invalid meeting data", errors: error.errors });
       }
-      console.error("Create meeting error:", error);
+      console.error("❌ Create meeting error:", error);
       res.status(500).json({ message: "Failed to create meeting" });
     }
   });
@@ -410,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/meetings/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    app.get("/api/meetings/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const meeting = await storage.getMeeting(req.params.id);
       if (!meeting) {
@@ -421,7 +450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user!;
       const organizations = await storage.getOrganizationsByOwner(user.id);
       const hasAccess = organizations.some(org => org.id === meeting.organizationId);
-      
+
       if (!hasAccess) {
         return res.status(403).json({ message: "Access denied" });
       }
@@ -430,6 +459,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get meeting error:", error);
       res.status(500).json({ message: "Failed to fetch meeting" });
+    }
+  });
+
+  // Update meeting endpoint
+  app.put("/api/meetings/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const meetingId = req.params.id;
+      const updates = req.body;
+
+      console.log('📝 Updating meeting:', meetingId, 'for user:', user.email);
+
+      // Check if meeting exists and user has access
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      console.log('💾 Storing meeting updates:', updates);
+      const updatedMeeting = await storage.updateMeeting(meetingId, updates);
+      console.log('✅ Meeting updated successfully');
+
+      res.json(updatedMeeting);
+    } catch (error) {
+      console.error("❌ Update meeting error:", error);
+      res.status(500).json({ message: "Failed to update meeting" });
     }
   });
 
@@ -637,32 +699,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get real-time transcript
-      try {
-        const { recallAIService } = await import('./services/recall-ai');
-        const transcript = await recallAIService.getRealTimeTranscript(botId);
-        res.json({
-          meetingId,
-          transcript: transcript.transcript,
-          speakers: transcript.speakers,
-          isLive: transcript.is_live,
-          language: transcript.language,
-          translatedText: transcript.translated_text,
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.log('⚠️  Using mock service for real-time transcript');
-        const { mockRecallAIService } = await import('./services/mock-recall-ai');
-        const transcript = await mockRecallAIService.getRealTimeTranscript(botId);
-        res.json({
-          meetingId,
-          transcript: transcript.transcript,
-          speakers: transcript.speakers,
-          isLive: transcript.is_live,
-          language: transcript.language,
-          translatedText: transcript.translated_text,
-          timestamp: new Date().toISOString()
-        });
-      }
+      const { recallAIService } = await import('./services/recall-ai');
+      const transcript = await recallAIService.getRealTimeTranscript(botId);
+      res.json({
+        meetingId,
+        transcript: transcript.transcript,
+        speakers: transcript.speakers,
+        isLive: transcript.is_live,
+        language: transcript.language,
+        translatedText: transcript.translated_text,
+        timestamp: new Date().toISOString()
+      });
     } catch (error) {
       console.error('Live transcript error:', error);
       res.status(500).json({ message: 'Failed to get live transcript' });
@@ -688,24 +735,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get bot status
-      try {
-        const { recallAIService } = await import('./services/recall-ai');
-        const botStatus = await recallAIService.getBotStatusDetailed(botId);
-        res.json({
-          meetingId,
-          botStatus,
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.log('⚠️  Using mock service for bot status');
-        const { mockRecallAIService } = await import('./services/mock-recall-ai');
-        const botStatus = await mockRecallAIService.getBotStatusDetailed(botId);
-        res.json({
-          meetingId,
-          botStatus,
-          timestamp: new Date().toISOString()
-        });
-      }
+      const { recallAIService } = await import('./services/recall-ai');
+      const botStatus = await recallAIService.getBotStatusDetailed(botId);
+      res.json({
+        meetingId,
+        botStatus,
+        timestamp: new Date().toISOString()
+      });
     } catch (error) {
       console.error('Bot status error:', error);
       res.status(500).json({ message: 'Failed to get bot status' });
@@ -718,19 +754,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const webhookData = req.body;
       console.log('📨 Received Recall.ai webhook:', webhookData);
 
+      // Store webhook event in database
+      const webhookEvent = await storage.createWebhookEvent({
+        source: 'recall_ai',
+        eventType: webhookData.event || 'unknown',
+        payload: webhookData,
+        processed: false
+      });
+      console.log('💾 Webhook event stored with ID:', webhookEvent.id);
+
       // Process the webhook event
-      try {
-        const { recallAIService } = await import('./services/recall-ai');
-        await recallAIService.processWebhook(webhookData);
-      } catch (error) {
-        console.log('⚠️  Using mock service for webhook processing');
-        const { mockRecallAIService } = await import('./services/mock-recall-ai');
-        await mockRecallAIService.processWebhook(webhookData);
-      }
+      const { recallAIService } = await import('./services/recall-ai');
+      await recallAIService.processWebhook(webhookData);
+      console.log('✅ Webhook processed with Recall.ai service');
+
+      // Mark webhook as processed
+      await storage.markWebhookEventProcessed(webhookEvent.id);
+      console.log('✅ Webhook event marked as processed');
 
       res.status(200).json({ success: true, message: 'Webhook processed successfully' });
     } catch (error) {
-      console.error('Webhook processing error:', error);
+      console.error('❌ Webhook processing error:', error);
       res.status(500).json({ 
         success: false, 
         error: 'Webhook processing failed',

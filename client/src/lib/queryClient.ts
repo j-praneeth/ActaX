@@ -1,5 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { supabase } from "./supabase";
+import { safeFetch } from "./safe-fetch";
+import { authService } from "./auth";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -13,9 +15,8 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Attach Supabase JWT for backend auth
-  const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData.session?.access_token;
+  // Get current session token (includes both Supabase and localStorage tokens)
+  const accessToken = await authService.getCurrentSessionToken();
 
   const res = await fetch(url, {
     method,
@@ -37,22 +38,29 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
+    // Get current session token (includes both Supabase and localStorage tokens)
+    const accessToken = await authService.getCurrentSessionToken();
 
-    const res = await fetch(queryKey.join("/") as string, {
+    const response = await safeFetch(queryKey.join("/") as string, {
       credentials: "include",
       headers: {
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+    if (unauthorizedBehavior === "returnNull" && response.status === 401) {
       return null;
     }
 
-    await throwIfResNotOk(res);
-    return await res.json();
+    if (!response.ok || response.error) {
+      throw new Error(response.error || `HTTP ${response.status}`);
+    }
+
+    if (response.data === null) {
+      throw new Error('No data received from server');
+    }
+
+    return response.data;
   };
 
 export const queryClient = new QueryClient({

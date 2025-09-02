@@ -99,7 +99,7 @@ export default function Dashboard() {
             <div className="mb-8">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Good Afternoon, {user?.name || 'User'}</h1>
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome, {user?.name || 'User'}</h1>
                   <p className="text-gray-600">Sunday, August 31, 2025</p>
                 </div>
                 <PlusMenu
@@ -121,20 +121,7 @@ export default function Dashboard() {
               </TabsList>
 
               <TabsContent value="meetings" className="space-y-6">
-                {/* Search and Create */}
-                <div className="flex items-center justify-between">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <Input
-                      placeholder="Search meetings..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <MeetingCreationModal onMeetingCreated={refetch} />
-                </div>
-
+                
                 {/* Meeting Details or Table */}
                 {selectedMeeting ? (
                   <div className="space-y-4">

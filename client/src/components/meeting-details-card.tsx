@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { safeFetch } from '@/lib/safe-fetch';
+import { authService } from '@/lib/auth';
 
 interface MeetingDetailsCardProps {
   meeting: {
@@ -77,17 +79,22 @@ export function MeetingDetailsCard({ meeting, onSync }: MeetingDetailsCardProps)
   const handleSync = async (provider: string) => {
     setSyncing(provider);
     try {
-      const response = await fetch(`/api/meetings/${meeting.id}/sync`, {
+      const sessionToken = await authService.getCurrentSessionToken();
+      if (!sessionToken) {
+        throw new Error('User not authenticated. Please sign in again.');
+      }
+
+      const response = await safeFetch(`/api/meetings/${meeting.id}/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${sessionToken}`,
         },
         body: JSON.stringify({ provider }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to sync to ${provider}`);
+      if (!response.ok || response.error) {
+        throw new Error(response.error || `Failed to sync to ${provider}`);
       }
 
       toast({

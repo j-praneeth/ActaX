@@ -12,6 +12,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { safeFetch } from '@/lib/safe-fetch';
+import { authService } from '@/lib/auth';
 
 interface Integration {
   id: string;
@@ -37,18 +39,22 @@ export function IntegrationsPanel({ onIntegrationAdded }: IntegrationsPanelProps
 
   const fetchIntegrations = async () => {
     try {
-      const response = await fetch('/api/integrations', {
+      const sessionToken = await authService.getCurrentSessionToken();
+      if (!sessionToken) {
+        throw new Error('User not authenticated. Please sign in again.');
+      }
+
+      const response = await safeFetch<Integration[]>('/api/integrations', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${sessionToken}`,
         },
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch integrations');
+      if (!response.ok || response.error || !response.data) {
+        throw new Error(response.error || 'Failed to fetch integrations');
       }
 
-      const data = await response.json();
-      setIntegrations(data);
+      setIntegrations(response.data);
     } catch (error) {
       console.error('Error fetching integrations:', error);
       toast({
@@ -64,18 +70,23 @@ export function IntegrationsPanel({ onIntegrationAdded }: IntegrationsPanelProps
   const handleConnect = async (provider: string) => {
     setConnecting(provider);
     try {
-      const response = await fetch(`/api/integrations/${provider}/connect`, {
+      const sessionToken = await authService.getCurrentSessionToken();
+      if (!sessionToken) {
+        throw new Error('User not authenticated. Please sign in again.');
+      }
+
+      const response = await safeFetch<{ authUrl: string }>(`/api/integrations/${provider}/connect`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${sessionToken}`,
         },
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to initiate ${provider} connection`);
+      if (!response.ok || response.error || !response.data) {
+        throw new Error(response.error || `Failed to initiate ${provider} connection`);
       }
 
-      const { authUrl } = await response.json();
+      const { authUrl } = response.data;
       
       // Open OAuth flow in new window
       const popup = window.open(
@@ -106,15 +117,20 @@ export function IntegrationsPanel({ onIntegrationAdded }: IntegrationsPanelProps
 
   const handleDisconnect = async (integrationId: string) => {
     try {
-      const response = await fetch(`/api/integrations/${integrationId}`, {
+      const sessionToken = await authService.getCurrentSessionToken();
+      if (!sessionToken) {
+        throw new Error('User not authenticated. Please sign in again.');
+      }
+
+      const response = await safeFetch(`/api/integrations/${integrationId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${sessionToken}`,
         },
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to disconnect integration');
+      if (!response.ok || response.error) {
+        throw new Error(response.error || 'Failed to disconnect integration');
       }
 
       toast({

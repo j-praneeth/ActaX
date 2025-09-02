@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { safeFetch } from "@/lib/safe-fetch";
 
 export default function Integrations() {
   const { user } = useAuth();
@@ -14,10 +15,14 @@ export default function Integrations() {
   });
 
   const handleConnect = async (provider: string) => {
-    const res = await apiRequest("POST", `/api/integrations/${provider}/connect`);
-    const { authUrl } = await res.json();
-    if (authUrl) {
-      window.location.href = authUrl;
+    try {
+      const res = await apiRequest("POST", `/api/integrations/${provider}/connect`);
+      const { authUrl } = await res.json();
+      if (authUrl) {
+        window.location.href = authUrl;
+      }
+    } catch (error) {
+      console.error('Failed to connect integration:', error);
     }
   };
 

@@ -4,6 +4,15 @@ import { setupVite, serveStatic, log } from "./vite";
 import 'dotenv/config';
 
 const app = express();
+
+// Set default content type to JSON for API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    res.setHeader('Content-Type', 'application/json');
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -44,8 +53,19 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    // Always return JSON for API routes
+    if (_req.path.startsWith('/api')) {
+      res.status(status).json({ 
+        error: 'Internal Server Error',
+        message: message,
+        status: status
+      });
+    } else {
+      res.status(status).json({ message });
+    }
+    
+    // Don't throw the error to prevent process exit
+    console.error('Server error:', err);
   });
 
   // importantly only setup vite in development and after

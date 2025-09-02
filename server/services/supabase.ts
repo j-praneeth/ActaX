@@ -89,13 +89,27 @@ export const supabaseService = {
 
   async verifySessionToken(token: string): Promise<User | null> {
     try {
-      const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+      // First, try to verify as Supabase JWT token
+      const { data: { user: authUser }, error } = await supabase.auth.getUser(token);
       
-      if (decoded.exp < Date.now()) {
-        return null; // Token expired
+      if (!error && authUser) {
+        // User is authenticated with Supabase, get or create user in our database
+        return await this.getUserFromAuth(authUser.id);
       }
 
-      return await storage.getUserById(decoded.userId);
+      // If Supabase verification fails, try custom token format (for backward compatibility)
+      try {
+        const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+        
+        if (decoded.exp < Date.now()) {
+          return null; // Token expired
+        }
+
+        return await storage.getUserById(decoded.userId);
+      } catch (customTokenError) {
+        console.error('Custom token verification error:', customTokenError);
+        return null;
+      }
     } catch (error) {
       console.error('Session token verification error:', error);
       return null;

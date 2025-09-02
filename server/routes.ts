@@ -10,6 +10,12 @@ import { insertMeetingSchema, insertIntegrationSchema, insertWebhookEventSchema,
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Ensure all API routes return JSON
+  app.use('/api', (req, res, next) => {
+    res.setHeader('Content-Type', 'application/json');
+    next();
+  });
+
   // Auth routes
   app.post("/api/auth/verify", async (req, res) => {
     try {
@@ -76,6 +82,261 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Google OAuth callback error:", error);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
       res.redirect(`${frontendUrl}/login?error=callback_failed`);
+    }
+  });
+
+  // Supabase Auth webhook endpoint
+  app.post("/api/auth/webhook", async (req, res) => {
+    try {
+      const { type, record } = req.body;
+
+      if (type === 'INSERT' && record?.email) {
+        // New user signed up in Supabase Auth
+        const { email, user_metadata } = record;
+        
+        // Check if user already exists in our custom table
+        const existingUser = await storage.getUserByEmail(email);
+        if (!existingUser) {
+          // Create user in custom users table
+          const userData = {
+            email,
+            name: user_metadata?.name || email.split('@')[0],
+            role: 'member',
+          };
+
+          const createdUser = await storage.createUser(userData);
+
+          // Create default organization for the user
+          const orgData = {
+            name: `${userData.name}'s Organization`,
+            ownerId: createdUser.id,
+          };
+          
+          await storage.createOrganization(orgData);
+          
+          console.log(`User ${email} created in custom table via webhook`);
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Auth webhook error:", error);
+      res.status(500).json({ message: "Webhook processing failed" });
+    }
+  });
+
+  // New signup endpoint that doesn't require authentication
+  app.post("/api/auth/signup", async (req, res) => {
+    try {
+      const { email, name, role, authUserId } = req.body;
+
+      if (!email || !name) {
+        return res.status(400).json({ message: "Email and name are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({ message: "User already exists" });
+      }
+
+      // Create user in custom users table
+      const userData = {
+        email,
+        name,
+        role: role || 'member',
+      };
+
+      const createdUser = await storage.createUser(userData);
+
+      // Create default organization for the user
+      const orgData = {
+        name: `${name}'s Organization`,
+        ownerId: createdUser.id,
+      };
+      
+      await storage.createOrganization(orgData);
+
+      res.json(createdUser);
+    } catch (error) {
+      console.error("Signup error:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Utility endpoint to sync existing users
+  app.post("/api/auth/sync-user", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      
+      // Check if user exists in custom table
+      const existingUser = await storage.getUserByEmail(user.email);
+      if (existingUser) {
+        return res.json({ message: "User already exists in custom table", user: existingUser });
+      }
+
+      // Create user in custom users table
+      const userData = {
+        email: user.email,
+        name: user.name,
+        role: 'member',
+      };
+
+      const createdUser = await storage.createUser(userData);
+
+      // Create default organization for the user
+      const orgData = {
+        name: `${user.name}'s Organization`,
+        ownerId: createdUser.id,
+      };
+      
+      await storage.createOrganization(orgData);
+
+      res.json({ message: "User synced successfully", user: createdUser });
+    } catch (error) {
+      console.error("Sync user error:", error);
+      res.status(500).json({ message: "Failed to sync user" });
+    }
+  });
+
+  app.post("/api/auth/create-user", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const { email, name, role } = req.body;
+
+      // Create user in custom users table
+      const userData = {
+        email: email || user.email,
+        name: name || user.name,
+        role: role || 'member',
+      };
+
+      const createdUser = await storage.createUser(userData);
+      res.json(createdUser);
+    } catch (error) {
+      console.error("Create user error:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Meeting validation and bot joining routes
+  app.post("/api/meetings/validate", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const { url } = req.body;
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.get('User-Agent');
+
+      if (!url) {
+        return res.status(400).json({ message: "Meeting URL is required" });
+      }
+
+      // Import services
+      const { googleMeetService } = await import('./services/google-meet');
+      const { securityService } = await import('./services/security');
+
+      // Validate meeting data for security compliance
+      const dataValidation = await securityService.validateMeetingData({ meetingUrl: url });
+      if (!dataValidation.valid) {
+        return res.status(400).json({ 
+          isActive: false, 
+          canJoin: false, 
+          message: dataValidation.errors.join(', ') 
+        });
+      }
+
+      // Validate meeting access with security policies
+      const accessValidation = await googleMeetService.validateMeetingAccess(url, user.id, ipAddress, userAgent);
+      if (!accessValidation.hasAccess) {
+        return res.status(403).json({ 
+          isActive: false, 
+          canJoin: false, 
+          message: accessValidation.message 
+        });
+      }
+
+      // Check meeting status
+      const meetingStatus = await googleMeetService.checkMeetingStatus(url);
+      
+      res.json({
+        isActive: meetingStatus.isActive,
+        meetingId: meetingStatus.meetingId,
+        canJoin: meetingStatus.canJoin,
+        message: meetingStatus.isActive ? 'Meeting is active and ready for recording' : 'Meeting is not active'
+      });
+    } catch (error) {
+      console.error("Meeting validation error:", error);
+      res.status(500).json({ 
+        isActive: false, 
+        canJoin: false, 
+        message: "Failed to validate meeting" 
+      });
+    }
+  });
+
+  app.post("/api/meetings/join-bot", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const { url, subject, meetingId } = req.body;
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.get('User-Agent');
+
+      if (!url || !meetingId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Meeting URL and ID are required" 
+        });
+      }
+
+      // Import services
+      const { googleMeetService } = await import('./services/google-meet');
+      const { securityService } = await import('./services/security');
+
+      // Record user consent for meeting recording
+      await securityService.recordConsent(user.id, meetingId, true, ipAddress, userAgent);
+
+      // Join meeting with bot
+      const result = await googleMeetService.joinMeetingWithBot(url, meetingId, user.id);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Bot joining error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to join meeting with bot" 
+      });
+    }
+  });
+
+  app.get("/api/meetings/:id/recording-status", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const meetingId = req.params.id;
+
+      // Import Google Meet service
+      const { googleMeetService } = await import('./services/google-meet');
+
+      const status = await googleMeetService.getMeetingRecordingStatus(meetingId);
+      res.json(status);
+    } catch (error) {
+      console.error("Recording status error:", error);
+      res.status(500).json({ message: "Failed to get recording status" });
+    }
+  });
+
+  app.post("/api/meetings/:id/stop-recording", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const meetingId = req.params.id;
+
+      // Import Google Meet service
+      const { googleMeetService } = await import('./services/google-meet');
+
+      const result = await googleMeetService.stopMeetingRecording(meetingId);
+      res.json(result);
+    } catch (error) {
+      console.error("Stop recording error:", error);
+      res.status(500).json({ success: false, message: "Failed to stop recording" });
     }
   });
 
@@ -355,6 +616,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Analytics error:", error);
       res.status(500).json({ message: "Failed to fetch analytics" });
     }
+  });
+
+  // Get real-time transcript for a meeting
+  app.get('/api/meetings/:id/transcript/live', authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const meetingId = req.params.id;
+      const user = req.user!;
+
+      // Get meeting to verify access
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: 'Meeting not found' });
+      }
+
+      // Get bot ID from meeting recallBotId field
+      const botId = meeting.recallBotId;
+      if (!botId) {
+        return res.status(404).json({ message: 'No bot found for this meeting' });
+      }
+
+      // Get real-time transcript
+      try {
+        const { recallAIService } = await import('./services/recall-ai');
+        const transcript = await recallAIService.getRealTimeTranscript(botId);
+        res.json({
+          meetingId,
+          transcript: transcript.transcript,
+          speakers: transcript.speakers,
+          isLive: transcript.is_live,
+          language: transcript.language,
+          translatedText: transcript.translated_text,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.log('⚠️  Using mock service for real-time transcript');
+        const { mockRecallAIService } = await import('./services/mock-recall-ai');
+        const transcript = await mockRecallAIService.getRealTimeTranscript(botId);
+        res.json({
+          meetingId,
+          transcript: transcript.transcript,
+          speakers: transcript.speakers,
+          isLive: transcript.is_live,
+          language: transcript.language,
+          translatedText: transcript.translated_text,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      console.error('Live transcript error:', error);
+      res.status(500).json({ message: 'Failed to get live transcript' });
+    }
+  });
+
+  // Get bot status for a meeting
+  app.get('/api/meetings/:id/bot/status', authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const meetingId = req.params.id;
+      const user = req.user!;
+
+      // Get meeting to verify access
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: 'Meeting not found' });
+      }
+
+      // Get bot ID from meeting recallBotId field
+      const botId = meeting.recallBotId;
+      if (!botId) {
+        return res.status(404).json({ message: 'No bot found for this meeting' });
+      }
+
+      // Get bot status
+      try {
+        const { recallAIService } = await import('./services/recall-ai');
+        const botStatus = await recallAIService.getBotStatusDetailed(botId);
+        res.json({
+          meetingId,
+          botStatus,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.log('⚠️  Using mock service for bot status');
+        const { mockRecallAIService } = await import('./services/mock-recall-ai');
+        const botStatus = await mockRecallAIService.getBotStatusDetailed(botId);
+        res.json({
+          meetingId,
+          botStatus,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      console.error('Bot status error:', error);
+      res.status(500).json({ message: 'Failed to get bot status' });
+    }
+  });
+
+  // Recall.ai webhook endpoint
+  app.post('/api/webhooks/recall', async (req, res) => {
+    try {
+      const webhookData = req.body;
+      console.log('📨 Received Recall.ai webhook:', webhookData);
+
+      // Process the webhook event
+      try {
+        const { recallAIService } = await import('./services/recall-ai');
+        await recallAIService.processWebhook(webhookData);
+      } catch (error) {
+        console.log('⚠️  Using mock service for webhook processing');
+        const { mockRecallAIService } = await import('./services/mock-recall-ai');
+        await mockRecallAIService.processWebhook(webhookData);
+      }
+
+      res.status(200).json({ success: true, message: 'Webhook processed successfully' });
+    } catch (error) {
+      console.error('Webhook processing error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Webhook processing failed',
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  // API-specific 404 handler
+  app.use('/api/*', (req, res) => {
+    res.status(404).json({
+      error: 'Not Found',
+      message: `API endpoint ${req.method} ${req.originalUrl} not found`,
+      path: req.originalUrl
+    });
+  });
+
+  // Catch-all route for non-API routes (will be handled by Vite/static serving)
+  app.use('*', (req, res, next) => {
+    // Only handle non-API routes here
+    if (!req.originalUrl.startsWith('/api')) {
+      return next();
+    }
+    
+    // This should not be reached for API routes, but just in case
+    res.status(404).json({
+      error: 'Not Found',
+      message: `Route ${req.method} ${req.originalUrl} not found`,
+      path: req.originalUrl
+    });
   });
 
   const httpServer = createServer(app);

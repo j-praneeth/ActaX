@@ -15,8 +15,8 @@ class GoogleAuthService {
   private oauth2Client: any;
 
   constructor() {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const clientId = process.env.GOOGLE_CLIENT_ID || '259038897737-ktrj9slptb2fd2u1td68gov4hed35f6m.apps.googleusercontent.com';
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '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';
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.CALLBACK_BASE_URL || 'http://localhost:5000'}/api/auth/google/callback`;
 
     if (!clientId || !clientSecret) {

@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email              String         @unique
+  password           String?
+  name               String
+  role               String         @default("member")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at")
+  ownedOrganizations Organization[]
+
+  @@map("users")
+}
+
+model Organization {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  ownerId      String        @map("owner_id") @db.Uuid
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at")
+  agents       Agent[]
+  integrations Integration[]
+  meetings     Meeting[]
+  owner        User          @relation(fields: [ownerId], references: [id])
+
+  @@map("organizations")
+}
+
+model Meeting {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title          String
+  description    String?
+  organizationId String         @map("organization_id") @db.Uuid
+  recallBotId    String?        @map("recall_bot_id")
+  status         String         @default("scheduled")
+  startTime      DateTime?      @map("start_time")
+  endTime        DateTime?      @map("end_time")
+  platform       String?
+  meetingUrl     String?        @map("meeting_url")
+  transcript     String?
+  summary        String?
+  actionItems    Json?          @map("action_items")
+  keyTopics      Json?          @map("key_topics")
+  decisions      Json?
+  takeaways      Json?
+  sentiment      String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at")
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  webhookEvents  WebhookEvent[]
+
+  @@map("meetings")
+}
+
+model Integration {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  provider       String
+  accessToken    String       @map("access_token")
+  refreshToken   String?      @map("refresh_token")
+  expiresAt      DateTime?    @map("expires_at")
+  isActive       Boolean      @default(true) @map("is_active")
+  settings       Json?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("integrations")
+}
+
+model Agent {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  name           String
+  goal           String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at")
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("agents")
+}
+
+model WebhookEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source    String
+  eventType String   @map("event_type")
+  payload   Json
+  processed Boolean  @default(false)
+  meetingId String?  @map("meeting_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  meeting   Meeting? @relation(fields: [meetingId], references: [id])
+
+  @@map("webhook_events")
+}

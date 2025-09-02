@@ -265,14 +265,14 @@ export class MemStorage implements IStorage {
   }
 }
 
-// Use Supabase storage if DATABASE_URL is available, otherwise fall back to in-memory storage
-const useSupabase = !!process.env.DATABASE_URL;
+// Use Prisma storage if DATABASE_URL is available, otherwise fall back to in-memory storage
+const useDatabase = !!process.env.DATABASE_URL;
 
 let storage: IStorage;
-if (useSupabase) {
+if (useDatabase) {
   // Dynamic import to avoid issues when DATABASE_URL is not set
-  const { SupabaseStorage } = await import('./supabase-storage');
-  storage = new SupabaseStorage();
+  const { PrismaStorage } = await import('./prisma-storage');
+  storage = new PrismaStorage();
 } else {
   storage = new MemStorage();
 }

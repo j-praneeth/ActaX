@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Edit, Trash2, Send, Download, RefreshCw } from "lucide-react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Meeting } from "@shared/schema";
 import { authService } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -50,8 +50,8 @@ export default function MeetingHighlights() {
       queryClient.invalidateQueries({ queryKey: ["/api/meetings", params.id] });
       setIsLoadingTranscript(false);
       toast({
-        title: "Success",
-        description: "Transcript fetched and stored successfully!",
+        title: "Transcript Ready",
+        description: "Meeting transcript has been successfully retrieved and is now available!",
       });
     },
     onError: (error) => {
@@ -69,6 +69,37 @@ export default function MeetingHighlights() {
     setIsLoadingTranscript(true);
     fetchTranscriptMutation.mutate();
   };
+
+  // Automatically fetch transcript when page loads if not available
+  useEffect(() => {
+    if (meeting && meeting.recallBotId && !meeting.transcript && !isLoadingTranscript && !fetchTranscriptMutation.isPending) {
+      console.log('🔄 Auto-fetching transcript for meeting:', meeting.id);
+      handleFetchTranscript();
+    }
+  }, [meeting, isLoadingTranscript, fetchTranscriptMutation.isPending]);
+
+  // Retry fetching transcript periodically if it failed and meeting is still in progress
+  useEffect(() => {
+    if (meeting && meeting.recallBotId && !meeting.transcript && 
+        (meeting.status === 'in_progress' || meeting.status === 'completed') &&
+        !isLoadingTranscript && !fetchTranscriptMutation.isPending) {
+      
+      const retryInterval = setInterval(() => {
+        console.log('🔄 Retrying transcript fetch for in-progress meeting');
+        handleFetchTranscript();
+      }, 30000); // Retry every 30 seconds
+
+      // Clear interval after 10 minutes or when transcript is found
+      const timeout = setTimeout(() => {
+        clearInterval(retryInterval);
+      }, 600000); // 10 minutes
+
+      return () => {
+        clearInterval(retryInterval);
+        clearTimeout(timeout);
+      };
+    }
+  }, [meeting?.transcript, meeting?.status, isLoadingTranscript, fetchTranscriptMutation.isPending]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -99,44 +130,38 @@ export default function MeetingHighlights() {
                       <div className="flex items-center space-x-2">
                         <div className="w-4 h-4 bg-purple-500 rounded"></div>
                         <span>Meeting Transcript</span>
+                        {(isLoadingTranscript || fetchTranscriptMutation.isPending) && (
+                          <RefreshCw className="h-4 w-4 animate-spin text-purple-500" />
+                        )}
                       </div>
-                      {meeting?.recallBotId && (
+                      {/* {meeting?.recallBotId && meeting?.transcript && (
                         <Button 
                           onClick={handleFetchTranscript}
                           disabled={isLoadingTranscript || fetchTranscriptMutation.isPending}
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
+                          title="Refresh transcript"
                         >
-                          {isLoadingTranscript || fetchTranscriptMutation.isPending ? (
-                            <>
-                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                              Fetching...
-                            </>
-                          ) : (
-                            <>
-                              <Download className="h-4 w-4 mr-2" />
-                              Fetch Transcript
-                            </>
-                          )}
+                          <RefreshCw className="h-4 w-4" />
                         </Button>
-                      )}
+                      )} */}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {meeting?.transcript ? (
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-500">
+                          {/* <span className="text-sm text-gray-500">
                             Transcript retrieved from Recall.ai Bot ID: {meeting.recallBotId}
-                          </span>
-                          <Button 
+                          </span> */}
+                          {/* <Button 
                             onClick={handleFetchTranscript}
                             disabled={isLoadingTranscript || fetchTranscriptMutation.isPending}
                             size="sm"
                             variant="ghost"
                           >
                             <RefreshCw className="h-4 w-4" />
-                          </Button>
+                          </Button> */}
                         </div>
                         <div className="max-h-96 overflow-y-auto">
                           <div className="whitespace-pre-wrap text-sm text-gray-700 p-4 bg-gray-50 rounded-lg border leading-relaxed">
@@ -146,28 +171,49 @@ export default function MeetingHighlights() {
                             }
                           </div>
                         </div>
-                        {meeting.transcript && (
+                        {/* {meeting.transcript && (
                           <div className="text-xs text-gray-400 mt-2">
                             Last updated: {new Date(meeting.updatedAt).toLocaleString()}
                           </div>
-                        )}
+                        )} */}
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <p className="text-gray-500 mb-4">No transcript available yet.</p>
-                        {meeting?.recallBotId ? (
+                        {(isLoadingTranscript || fetchTranscriptMutation.isPending) ? (
                           <div className="space-y-4">
+                            <RefreshCw className="h-8 w-8 animate-spin text-purple-500 mx-auto" />
+                            <p className="text-gray-600">Fetching transcript from Recall.ai...</p>
                             <p className="text-sm text-gray-400">
-                              Bot ID: {meeting.recallBotId}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Click "Fetch Transcript" to retrieve the latest transcript from Recall.ai.
+                              Bot ID: {meeting?.recallBotId}
                             </p>
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-400">
-                            No recording bot associated with this meeting.
-                          </p>
+                          <div>
+                            <p className="text-gray-500 mb-4">No transcript available yet.</p>
+                            {meeting?.recallBotId ? (
+                              <div className="space-y-4">
+                                <p className="text-sm text-gray-400">
+                                  Bot ID: {meeting.recallBotId}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  Transcript will be automatically fetched when available.
+                                </p>
+                                <Button 
+                                  onClick={handleFetchTranscript}
+                                  disabled={isLoadingTranscript || fetchTranscriptMutation.isPending}
+                                  size="sm"
+                                  variant="outline"
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Try Fetch Now
+                                </Button>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-400">
+                                No recording bot associated with this meeting.
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}

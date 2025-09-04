@@ -105,7 +105,8 @@ export const supabaseService = {
           return null; // Token expired
         }
 
-        return await storage.getUserById(decoded.userId);
+        const user = await storage.getUserById(decoded.userId);
+        return user ?? null;
       } catch (customTokenError) {
         console.error('Custom token verification error:', customTokenError);
         return null;

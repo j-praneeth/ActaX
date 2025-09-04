@@ -47,8 +47,8 @@ class APIConfigurationManager {
   private loadConfiguration(): APIConfiguration {
     return {
       googleMeet: {
-        clientId: process.env.GOOGLE_CLIENT_ID || '',
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+        clientId: process.env.GOOGLE_CLIENT_ID || '917455473484-gqhhte5990hnk9qq5a7fdfpl4ugkj2mr.apps.googleusercontent.com',
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
         redirectUri: process.env.GOOGLE_REDIRECT_URI || `${process.env.FRONTEND_URL}/api/auth/google/callback`,
         scopes: [
           'https://www.googleapis.com/auth/calendar',

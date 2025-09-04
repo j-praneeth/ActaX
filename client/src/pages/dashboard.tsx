@@ -106,7 +106,8 @@ export default function Dashboard() {
                   onInviteLiveMeeting={handleInviteLiveMeeting}
                   onUploadAudio={handleUploadAudio}
                   onRecordAudio={handleRecordAudio}
-                />
+                  
+                 /> 
               </div>
             </div>
 

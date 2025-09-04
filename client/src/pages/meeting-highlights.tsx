@@ -53,6 +53,11 @@ export default function MeetingHighlights() {
         title: "Transcript Ready",
         description: "Meeting transcript has been successfully retrieved and is now available!",
       });
+      
+      // Automatically trigger insights generation after transcript is fetched
+      if (data.meeting?.transcript) {
+        generateInsightsMutation.mutate();
+      }
     },
     onError: (error) => {
       console.error('Failed to fetch transcript:', error);
@@ -61,6 +66,47 @@ export default function MeetingHighlights() {
         variant: "destructive",
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to fetch transcript",
+      });
+    }
+  });
+
+  const generateInsightsMutation = useMutation({
+    mutationFn: async () => {
+      const sessionToken = await authService.getCurrentSessionToken();
+      
+      if (!sessionToken) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/meetings/${params.id}/generate-insights`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to generate insights');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Refetch the meeting data to get updated insights
+      queryClient.invalidateQueries({ queryKey: ["/api/meetings", params.id] });
+      toast({
+        title: "Insights Generated",
+        description: "AI-powered meeting insights have been generated successfully!",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to generate insights:', error);
+      toast({
+        variant: "destructive",
+        title: "Insights Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate insights",
       });
     }
   });
@@ -77,6 +123,16 @@ export default function MeetingHighlights() {
       handleFetchTranscript();
     }
   }, [meeting, isLoadingTranscript, fetchTranscriptMutation.isPending]);
+
+  // Automatically generate insights when transcript is available but insights are missing
+  useEffect(() => {
+    if (meeting && meeting.transcript && 
+        (!meeting.summary || !meeting.actionItems || !meeting.keyTopics || !meeting.takeaways) &&
+        !generateInsightsMutation.isPending) {
+      console.log('🧠 Auto-generating insights for meeting:', meeting.id);
+      generateInsightsMutation.mutate();
+    }
+  }, [meeting?.transcript, meeting?.summary, meeting?.actionItems, meeting?.keyTopics, meeting?.takeaways, generateInsightsMutation.isPending]);
 
   // Retry fetching transcript periodically if it failed and meeting is still in progress
   useEffect(() => {
@@ -116,10 +172,35 @@ export default function MeetingHighlights() {
                 {/* Meeting Summary */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Meeting Summary</CardTitle>
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-green-500 rounded"></div>
+                        <span>Meeting Summary</span>
+                        {generateInsightsMutation.isPending && (
+                          <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
+                        )}
+                      </div>
+                      {meeting?.transcript && !meeting?.summary && (
+                        <Button 
+                          onClick={() => generateInsightsMutation.mutate()}
+                          disabled={generateInsightsMutation.isPending}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Generate Summary
+                        </Button>
+                      )}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-700">{meeting?.summary || 'No summary yet.'}</p>
+                    {generateInsightsMutation.isPending ? (
+                      <div className="flex items-center space-x-2">
+                        <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
+                        <p className="text-gray-600">Generating AI-powered summary...</p>
+                      </div>
+                    ) : (
+                      <p className="text-gray-700">{meeting?.summary || 'Summary will be generated automatically once transcript is available.'}</p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -189,7 +270,7 @@ export default function MeetingHighlights() {
                           </div>
                         ) : (
                           <div>
-                            <p className="text-gray-500 mb-4">Retrieving transcript please wait...</p>
+                            <p className="text-gray-500 mb-4">Retrieving transcript and generating AI insights...</p>
                             {meeting?.recallBotId ? (
                               <div className="space-y-4">
                                 <p className="text-sm text-gray-400">
@@ -223,129 +304,209 @@ export default function MeetingHighlights() {
                 {/* Action Points */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <div className="w-4 h-4 bg-blue-500 rounded"></div>
-                      <span>Action Points</span>
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                        <span>Action Points</span>
+                        {generateInsightsMutation.isPending && (
+                          <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+                        )}
+                      </div>
+                      {meeting?.transcript && (!meeting?.actionItems || !Array.isArray(meeting?.actionItems) || meeting?.actionItems.length === 0) && (
+                        <Button 
+                          onClick={() => generateInsightsMutation.mutate()}
+                          disabled={generateInsightsMutation.isPending}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Generate Action Items
+                        </Button>
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-2">#</th>
-                            <th className="text-left py-2">POINT</th>
-                            <th className="text-left py-2">OWNER</th>
-                            <th className="text-left py-2">ACTION</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(Array.isArray(meeting?.actionItems) ? meeting?.actionItems : []).map((point: any, idx: number) => (
-                            <tr key={idx} className="border-b">
-                              <td className="py-3">{idx + 1}</td>
-                              <td className="py-3">{point}</td>
-                              <td className="py-3">-</td>
-                              <td className="py-3">
-                                <div className="flex space-x-2">
-                                  <Button variant="ghost" size="sm">
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    {generateInsightsMutation.isPending ? (
+                      <div className="flex items-center space-x-2">
+                        <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+                        <p className="text-gray-600">Generating action items...</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        {Array.isArray(meeting?.actionItems) && meeting.actionItems.length > 0 ? (
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="text-left py-2">#</th>
+                                <th className="text-left py-2">ACTION ITEM</th>
+                                <th className="text-left py-2">OWNER</th>
+                                <th className="text-left py-2">ACTION</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {meeting.actionItems.map((point: any, idx: number) => (
+                                <tr key={idx} className="border-b">
+                                  <td className="py-3">{idx + 1}</td>
+                                  <td className="py-3 text-sm">{point}</td>
+                                  <td className="py-3">-</td>
+                                  <td className="py-3">
+                                    <div className="flex space-x-2">
+                                      <Button variant="ghost" size="sm">
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm">
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <p className="text-gray-500 text-center py-4">
+                            {meeting?.transcript ? 'No Action items for this transcript' : 'Action items will be available once transcript is processed.'}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
                 {/* Topics */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <div className="w-4 h-4 bg-yellow-500 rounded"></div>
-                      <span>Topics</span>
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-yellow-500 rounded"></div>
+                        <span>Key Topics</span>
+                        {generateInsightsMutation.isPending && (
+                          <RefreshCw className="h-4 w-4 animate-spin text-yellow-500" />
+                        )}
+                      </div>
+                      {meeting?.transcript && (!meeting?.keyTopics || !Array.isArray(meeting?.keyTopics) || meeting?.keyTopics.length === 0) && (
+                        <Button 
+                          onClick={() => generateInsightsMutation.mutate()}
+                          disabled={generateInsightsMutation.isPending}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Generate Topics
+                        </Button>
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-2">#</th>
-                            <th className="text-left py-2">TOPIC</th>
-                            <th className="text-left py-2">DESCRIPTION</th>
-                            <th className="text-left py-2">SPEAKER</th>
-                            <th className="text-left py-2">ACTION</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(Array.isArray(meeting?.keyTopics) ? meeting?.keyTopics : []).map((topic: any, idx: number) => (
-                            <tr key={idx} className="border-b">
-                              <td className="py-3">{idx + 1}</td>
-                              <td className="py-3">{topic}</td>
-                              <td className="py-3">-</td>
-                              <td className="py-3">-</td>
-                              <td className="py-3">
-                                <div className="flex space-x-2">
-                                  <Button variant="ghost" size="sm">
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    {generateInsightsMutation.isPending ? (
+                      <div className="flex items-center space-x-2">
+                        <RefreshCw className="h-4 w-4 animate-spin text-yellow-500" />
+                        <p className="text-gray-600">Identifying key topics...</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        {Array.isArray(meeting?.keyTopics) && meeting.keyTopics.length > 0 ? (
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="text-left py-2">#</th>
+                                <th className="text-left py-2">TOPIC</th>
+                                <th className="text-left py-2">ACTION</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {meeting.keyTopics.map((topic: any, idx: number) => (
+                                <tr key={idx} className="border-b">
+                                  <td className="py-3">{idx + 1}</td>
+                                  <td className="py-3 text-sm">{topic}</td>
+                                  <td className="py-3">
+                                    <div className="flex space-x-2">
+                                      <Button variant="ghost" size="sm">
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm">
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <p className="text-gray-500 text-center py-4">
+                            {meeting?.transcript ? 'Key topics will be generated automatically.' : 'Key topics will be available once transcript is processed.'}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
                 {/* Key Takeaways */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <div className="w-4 h-4 bg-green-500 rounded"></div>
-                      <span>Key Takeaways</span>
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-green-500 rounded"></div>
+                        <span>Key Takeaways</span>
+                        {generateInsightsMutation.isPending && (
+                          <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
+                        )}
+                      </div>
+                      {meeting?.transcript && (!meeting?.takeaways || !Array.isArray(meeting?.takeaways) || meeting?.takeaways.length === 0) && (
+                        <Button 
+                          onClick={() => generateInsightsMutation.mutate()}
+                          disabled={generateInsightsMutation.isPending}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Generate Takeaways
+                        </Button>
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-2">#</th>
-                            <th className="text-left py-2">TEXT</th>
-                            <th className="text-left py-2">ACTION</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(Array.isArray(meeting?.takeaways) ? meeting?.takeaways : []).map((text: any, idx: number) => (
-                            <tr key={idx} className="border-b">
-                              <td className="py-3">{idx + 1}</td>
-                              <td className="py-3">{text}</td>
-                              <td className="py-3">
-                                <div className="flex space-x-2">
-                                  <Button variant="ghost" size="sm">
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    {generateInsightsMutation.isPending ? (
+                      <div className="flex items-center space-x-2">
+                        <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
+                        <p className="text-gray-600">Extracting key takeaways...</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        {Array.isArray(meeting?.takeaways) && meeting.takeaways.length > 0 ? (
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="text-left py-2">#</th>
+                                <th className="text-left py-2">TAKEAWAY</th>
+                                <th className="text-left py-2">ACTION</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {meeting.takeaways.map((text: any, idx: number) => (
+                                <tr key={idx} className="border-b">
+                                  <td className="py-3">{idx + 1}</td>
+                                  <td className="py-3 text-sm">{text}</td>
+                                  <td className="py-3">
+                                    <div className="flex space-x-2">
+                                      <Button variant="ghost" size="sm">
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm">
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <p className="text-gray-500 text-center py-4">
+                            {meeting?.transcript ? 'Key takeaways will be generated automatically.' : 'Key takeaways will be available once transcript is processed.'}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

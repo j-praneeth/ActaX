@@ -1,5 +1,6 @@
 import type { WebhookEvent, Meeting } from "@shared/schema";
 import { storage } from "../storage";
+import { geminiService } from "./gemini";
 
 const RECALL_API_KEY = process.env.RECALL_API_KEY || process.env.VITE_RECALL_API_KEY;
 
@@ -337,15 +338,17 @@ class RecallAIService {
 
       const transcript = await this.getTranscript(recordingId);
       
+      // First store the transcript
       await storage.updateMeeting(meeting.id, {
         transcript: transcript.transcript_text,
-        summary: transcript.summary,
-        actionItems: transcript.action_items || [],
-        keyTopics: transcript.key_topics || [],
-        decisions: transcript.decisions || [],
-        takeaways: transcript.takeaways || [],
-        sentiment: transcript.sentiment,
+        status: 'completed'
       });
+      
+      // Then generate insights with Gemini
+      const updatedMeeting = await storage.getMeeting(meeting.id);
+      if (updatedMeeting) {
+        await this.generateMeetingInsights(updatedMeeting);
+      }
     } catch (error) {
       console.error("Failed to process transcript:", error);
     }
@@ -480,18 +483,20 @@ class RecallAIService {
         try {
           const transcript = await this.getTranscript(latestRecording.id);
           
+          // First store the transcript
           await storage.updateMeeting(meetingId, {
             transcript: transcript.transcript_text,
-            summary: transcript.summary,
-            actionItems: transcript.action_items || [],
-            keyTopics: transcript.key_topics || [],
-            decisions: transcript.decisions || [],
-            takeaways: transcript.takeaways || [],
-            sentiment: transcript.sentiment,
             status: 'completed'
           });
 
           console.log(`💾 Transcript from recording ID stored successfully for meeting: ${meetingId}`);
+          
+          // Then generate insights with Gemini
+          const updatedMeeting = await storage.getMeeting(meetingId);
+          if (updatedMeeting) {
+            await this.generateMeetingInsights(updatedMeeting);
+          }
+          
           return;
         } catch (transcriptError) {
           console.log(`⚠️ Failed to get transcript from recording ID: ${transcriptError instanceof Error ? transcriptError.message : String(transcriptError)}`);
@@ -508,6 +513,15 @@ class RecallAIService {
             status: botInfo.status === 'done' ? 'completed' : 'in_progress'
           });
           console.log(`💾 Real-time transcript stored for meeting: ${meetingId}`);
+          
+          // Generate insights if meeting is completed
+          if (botInfo.status === 'done') {
+            const updatedMeeting = await storage.getMeeting(meetingId);
+            if (updatedMeeting) {
+              await this.generateMeetingInsights(updatedMeeting);
+            }
+          }
+          
           return;
         }
       } catch (realtimeError) {
@@ -525,25 +539,42 @@ class RecallAIService {
   async generateMeetingInsights(meeting: Meeting): Promise<void> {
     if (!meeting.transcript) return;
 
-    // This would typically call an AI service to generate insights
-    // For now, we'll create basic insights from the transcript
-    const transcript = meeting.transcript;
-    const words = transcript.split(" ");
+    console.log('🧠 Generating meeting insights for meeting:', meeting.id);
     
-    // Generate basic action items (this would be AI-powered in production)
-    const actionItems = this.extractActionItems(transcript);
-    const keyTopics = this.extractKeyTopics(transcript);
-    const decisions = this.extractDecisions(transcript);
-    const takeaways = this.extractTakeaways(transcript);
-    
-    await storage.updateMeeting(meeting.id, {
-      actionItems,
-      keyTopics,
-      decisions,
-      takeaways,
-      summary: this.generateSummary(transcript),
-      sentiment: this.analyzeSentiment(transcript),
-    });
+    try {
+      // Use Gemini to analyze the transcript
+      const insights = await geminiService.analyzeMeetingTranscript(meeting.transcript);
+      
+      await storage.updateMeeting(meeting.id, {
+        summary: insights.summary,
+        actionItems: insights.actionItems,
+        keyTopics: insights.keyTopics,
+        takeaways: insights.takeaways,
+        sentiment: this.analyzeSentiment(meeting.transcript), // Keep existing sentiment analysis
+      });
+      
+      console.log('✅ Meeting insights generated and stored successfully');
+    } catch (error) {
+      console.error('❌ Failed to generate insights with Gemini:', error);
+      
+      // Fallback to basic extraction
+      console.log('🔄 Using fallback analysis...');
+      const actionItems = this.extractActionItems(meeting.transcript);
+      const keyTopics = this.extractKeyTopics(meeting.transcript);
+      const decisions = this.extractDecisions(meeting.transcript);
+      const takeaways = this.extractTakeaways(meeting.transcript);
+      
+      await storage.updateMeeting(meeting.id, {
+        actionItems,
+        keyTopics,
+        decisions,
+        takeaways,
+        summary: this.generateSummary(meeting.transcript),
+        sentiment: this.analyzeSentiment(meeting.transcript),
+      });
+      
+      console.log('✅ Fallback insights generated and stored');
+    }
   }
 
   private extractActionItems(transcript: string): string[] {

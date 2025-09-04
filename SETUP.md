@@ -31,6 +31,9 @@ GOOGLE_REDIRECT_URI=http://localhost:5000/api/auth/google/callback
 # Recall.ai
 RECALL_API_KEY=your-recall-api-key
 
+# Google Gemini AI
+GEMINI_API_KEY=your-gemini-api-key
+
 # Jira Integration
 JIRA_CLIENT_ID=your-jira-client-id
 JIRA_CLIENT_SECRET=your-jira-client-secret
@@ -103,7 +106,15 @@ NODE_ENV=development
 2. Get your API key from the dashboard
 3. Add it to your `.env` file as `RECALL_API_KEY`
 
-### 4. Jira Integration Setup
+### 4. Google Gemini AI Setup
+
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Create an API key for Gemini
+3. Add it to your `.env` file as `GEMINI_API_KEY`
+
+**Note:** The system will work with basic text extraction if Gemini is not configured, but AI-powered insights require the API key.
+
+### 5. Jira Integration Setup
 
 1. Go to [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/)
 2. Create a new app
@@ -113,13 +124,13 @@ NODE_ENV=development
    - `write:jira-work`
 5. Copy the Client ID and Client Secret to your `.env` file
 
-### 5. Install Dependencies
+### 6. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 6. Run the Application
+### 7. Run the Application
 
 ```bash
 # Development mode
@@ -146,7 +157,13 @@ npm start
 - Automatic Google Meet meeting recording
 - Real-time transcription and AI analysis
 - Webhook processing for meeting events
-- Meeting insights generation (action items, key topics, decisions, takeaways)
+
+### ✅ AI-Powered Meeting Analysis (Gemini)
+- Automatic generation of meeting summaries
+- Intelligent extraction of key topics
+- Action items identification and tracking
+- Key takeaways and insights generation
+- Fallback to basic text extraction if AI is unavailable
 
 ### ✅ Jira Integration
 - Automatic meeting summary creation in Jira
@@ -178,6 +195,8 @@ npm start
 - `GET /api/meetings` - Get user's meetings
 - `POST /api/meetings` - Create new meeting
 - `GET /api/meetings/:id` - Get meeting details
+- `POST /api/meetings/:id/fetch-transcript` - Fetch transcript from Recall.ai
+- `POST /api/meetings/:id/generate-insights` - Generate AI insights from transcript
 - `POST /api/meetings/:id/sync` - Sync meeting to integration
 
 ### Integrations

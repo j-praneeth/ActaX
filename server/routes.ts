@@ -542,6 +542,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate meeting insights using Gemini
+  app.post("/api/meetings/:id/generate-insights", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const meetingId = req.params.id;
+
+      console.log('🧠 Generating insights for meeting:', meetingId, 'by user:', user.email);
+
+      // Check if meeting exists and user has access
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Check if meeting has a transcript
+      if (!meeting.transcript) {
+        return res.status(400).json({ message: "No transcript available for this meeting" });
+      }
+
+      // Generate insights
+      await recallAIService.generateMeetingInsights(meeting);
+      
+      // Return updated meeting data
+      const updatedMeeting = await storage.getMeeting(meetingId);
+      console.log('✅ Insights generated successfully');
+
+      res.json({ 
+        success: true, 
+        message: "Meeting insights generated successfully",
+        meeting: updatedMeeting 
+      });
+    } catch (error) {
+      console.error("❌ Generate insights error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Failed to generate insights" 
+      });
+    }
+  });
+
   // Integrations routes
   app.get("/api/integrations", authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {

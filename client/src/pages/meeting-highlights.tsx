@@ -3,20 +3,21 @@ import { MeetingSidebar } from "@/components/meeting-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Edit, Trash2, Send, Download, RefreshCw } from "lucide-react";
+import { Edit, Trash2, Send, Download, RefreshCw, ArrowLeft } from "lucide-react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import type { Meeting } from "@shared/schema";
 import { authService } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 export default function MeetingHighlights() {
   const params = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
   const { toast } = useToast();
-  
+
   const { data: meeting, isLoading } = useQuery<Meeting | null>({
     queryKey: ["/api/meetings", params.id],
     enabled: !!params?.id,
@@ -25,7 +26,7 @@ export default function MeetingHighlights() {
   const fetchTranscriptMutation = useMutation({
     mutationFn: async () => {
       const sessionToken = await authService.getCurrentSessionToken();
-      
+
       if (!sessionToken) {
         throw new Error('Authentication required');
       }
@@ -53,7 +54,7 @@ export default function MeetingHighlights() {
         title: "Transcript Ready",
         description: "Meeting transcript has been successfully retrieved and is now available!",
       });
-      
+
       // Automatically trigger insights generation after transcript is fetched
       if (data.meeting?.transcript) {
         generateInsightsMutation.mutate();
@@ -73,7 +74,7 @@ export default function MeetingHighlights() {
   const generateInsightsMutation = useMutation({
     mutationFn: async () => {
       const sessionToken = await authService.getCurrentSessionToken();
-      
+
       if (!sessionToken) {
         throw new Error('Authentication required');
       }
@@ -126,9 +127,9 @@ export default function MeetingHighlights() {
 
   // Automatically generate insights when transcript is available but insights are missing
   useEffect(() => {
-    if (meeting && meeting.transcript && 
-        (!meeting.summary || !meeting.actionItems || !meeting.keyTopics || !meeting.takeaways) &&
-        !generateInsightsMutation.isPending) {
+    if (meeting && meeting.transcript &&
+      (!meeting.summary || !meeting.actionItems || !meeting.keyTopics || !meeting.takeaways) &&
+      !generateInsightsMutation.isPending) {
       console.log('🧠 Auto-generating insights for meeting:', meeting.id);
       generateInsightsMutation.mutate();
     }
@@ -136,10 +137,10 @@ export default function MeetingHighlights() {
 
   // Retry fetching transcript periodically if it failed and meeting is still in progress
   useEffect(() => {
-    if (meeting && meeting.recallBotId && !meeting.transcript && 
-        (meeting.status === 'in_progress' || meeting.status === 'completed') &&
-        !isLoadingTranscript && !fetchTranscriptMutation.isPending) {
-      
+    if (meeting && meeting.recallBotId && !meeting.transcript &&
+      (meeting.status === 'in_progress' || meeting.status === 'completed') &&
+      !isLoadingTranscript && !fetchTranscriptMutation.isPending) {
+
       const retryInterval = setInterval(() => {
         console.log('🔄 Retrying transcript fetch for in-progress meeting');
         handleFetchTranscript();
@@ -161,49 +162,20 @@ export default function MeetingHighlights() {
     <div className="min-h-screen bg-white">
       <Header />
       <div className="flex">
-        <MeetingSidebar currentPage="highlights" />
-        
+        {/* <MeetingSidebar currentPage="highlights" /> */}
+
         {/* Main Content */}
         <div className="flex-1 pt-16">
           <div className="max-w-7xl mx-auto px-6 py-8">
             <div className="grid lg:grid-cols-3 gap-8">
               {/* Left Column - Main Content */}
               <div className="lg:col-span-2 space-y-8">
-                {/* Meeting Summary */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 bg-green-500 rounded"></div>
-                        <span>Meeting Summary</span>
-                        {generateInsightsMutation.isPending && (
-                          <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
-                        )}
-                      </div>
-                      {meeting?.transcript && !meeting?.summary && (
-                        <Button 
-                          onClick={() => generateInsightsMutation.mutate()}
-                          disabled={generateInsightsMutation.isPending}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Generate Summary
-                        </Button>
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {generateInsightsMutation.isPending ? (
-                      <div className="flex items-center space-x-2">
-                        <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
-                        <p className="text-gray-600">Generating AI-powered summary...</p>
-                      </div>
-                    ) : (
-                      <p className="text-gray-700">{meeting?.summary || 'Summary will be generated automatically once transcript is available.'}</p>
-                    )}
-                  </CardContent>
-                </Card>
 
+                <Link href="/dashboard" className="flex items-center space-x-2 gap-2  p-2 w-fit mb-4">
+                  <Button size="sm"
+                      variant="outline"
+                      className="relative right-0"><ArrowLeft className="h-5 w-5 text-gray-600 hover:text-gray-900 cursor-pointer" /> Back</Button>
+                </Link>
                 {/* Transcript Section */}
                 <Card>
                   <CardHeader>
@@ -246,8 +218,8 @@ export default function MeetingHighlights() {
                         </div>
                         <div className="max-h-96 overflow-y-auto">
                           <div className="whitespace-pre-wrap text-sm text-gray-700 p-4 bg-gray-50 rounded-lg border leading-relaxed">
-                            {typeof meeting.transcript === 'string' 
-                              ? meeting.transcript 
+                            {typeof meeting.transcript === 'string'
+                              ? meeting.transcript
                               : JSON.stringify(meeting.transcript, null, 2)
                             }
                           </div>
@@ -279,7 +251,7 @@ export default function MeetingHighlights() {
                                 <p className="text-sm text-gray-600">
                                   Transcript will be automatically fetched when available.
                                 </p>
-                                <Button 
+                                <Button
                                   onClick={handleFetchTranscript}
                                   disabled={isLoadingTranscript || fetchTranscriptMutation.isPending}
                                   size="sm"
@@ -301,6 +273,48 @@ export default function MeetingHighlights() {
                   </CardContent>
                 </Card>
 
+                {/* Generating Button for Summary, Action Items, Key Topics, and Takeaways */}
+                <div className="flex justify-end">
+                  {meeting?.transcript && (!meeting?.actionItems || !Array.isArray(meeting?.actionItems) || meeting?.actionItems.length === 0) && (
+                    <Button
+                      onClick={() => generateInsightsMutation.mutate()}
+                      disabled={generateInsightsMutation.isPending}
+                      size="sm"
+                      variant="outline"
+                      className="relative right-0"
+                    >
+                      Generate Meeting Insights
+                    </Button>
+                  )}
+                </div>
+
+
+                {/* Meeting Summary */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-green-500 rounded"></div>
+                        <span>Meeting Summary</span>
+                        {generateInsightsMutation.isPending && (
+                          <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
+                        )}
+                      </div>
+                      
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {generateInsightsMutation.isPending ? (
+                      <div className="flex items-center space-x-2">
+                        <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
+                        <p className="text-gray-600">Generating AI-powered summary...</p>
+                      </div>
+                    ) : (
+                      <p className="text-gray-700">{meeting?.summary || 'Summary will be generated automatically once transcript is available.'}</p>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* Action Points */}
                 <Card>
                   <CardHeader>
@@ -312,16 +326,7 @@ export default function MeetingHighlights() {
                           <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
                         )}
                       </div>
-                      {meeting?.transcript && (!meeting?.actionItems || !Array.isArray(meeting?.actionItems) || meeting?.actionItems.length === 0) && (
-                        <Button 
-                          onClick={() => generateInsightsMutation.mutate()}
-                          disabled={generateInsightsMutation.isPending}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Generate Action Items
-                        </Button>
-                      )}
+
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -383,16 +388,7 @@ export default function MeetingHighlights() {
                           <RefreshCw className="h-4 w-4 animate-spin text-yellow-500" />
                         )}
                       </div>
-                      {meeting?.transcript && (!meeting?.keyTopics || !Array.isArray(meeting?.keyTopics) || meeting?.keyTopics.length === 0) && (
-                        <Button 
-                          onClick={() => generateInsightsMutation.mutate()}
-                          disabled={generateInsightsMutation.isPending}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Generate Topics
-                        </Button>
-                      )}
+                      
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -452,16 +448,7 @@ export default function MeetingHighlights() {
                           <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
                         )}
                       </div>
-                      {meeting?.transcript && (!meeting?.takeaways || !Array.isArray(meeting?.takeaways) || meeting?.takeaways.length === 0) && (
-                        <Button 
-                          onClick={() => generateInsightsMutation.mutate()}
-                          disabled={generateInsightsMutation.isPending}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Generate Takeaways
-                        </Button>
-                      )}
+                      
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -512,9 +499,9 @@ export default function MeetingHighlights() {
               </div>
 
               {/* Right Column - Sidebar */}
-              <div className="space-y-6">
+              <div className="space-y-8">
                 {/* Participants - dynamic when available */}
-                <Card>
+                <Card className="mt-16">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       <span>Participants</span>
@@ -525,7 +512,7 @@ export default function MeetingHighlights() {
                   </CardContent>
                 </Card>
 
-                {/* Ask Section */}
+                {/* Ask Section
                 <Card>
                   <CardHeader>
                     <CardTitle>Ask?</CardTitle>
@@ -541,11 +528,11 @@ export default function MeetingHighlights() {
                         </div>
                       ))}
                     </div>
-                    
+
                     <div className="mt-4">
                       <div className="flex space-x-2">
-                        <Input 
-                          placeholder="Ask anything about meeting..." 
+                        <Input
+                          placeholder="Ask anything about meeting..."
                           className="flex-1"
                         />
                         <Button size="sm">
@@ -554,7 +541,7 @@ export default function MeetingHighlights() {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
+                </Card> */}
               </div>
             </div>
           </div>

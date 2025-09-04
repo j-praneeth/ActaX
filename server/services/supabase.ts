@@ -116,4 +116,58 @@ export const supabaseService = {
       return null;
     }
   },
+
+  async refreshUserSession(refreshToken: string): Promise<{ user: User | null; accessToken: string | null }> {
+    try {
+      // Use Supabase to refresh the session
+      const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+      
+      if (error || !data.session) {
+        console.warn('Session refresh failed:', error);
+        return { user: null, accessToken: null };
+      }
+
+      // Get user from our database
+      const user = await this.getUserFromAuth(data.session.user.id);
+      
+      return { 
+        user, 
+        accessToken: data.session.access_token 
+      };
+    } catch (error) {
+      console.error('Error refreshing user session:', error);
+      return { user: null, accessToken: null };
+    }
+  },
+
+  async validateAndRefreshSession(token: string): Promise<{ user: User | null; newToken?: string }> {
+    try {
+      // Try to verify current token
+      const user = await this.verifySessionToken(token);
+      
+      if (user) {
+        return { user };
+      }
+
+      // If token is invalid, try to refresh session if it's a Supabase token
+      try {
+        const { data: { session } } = await supabase.auth.refreshSession();
+        
+        if (session?.user) {
+          const refreshedUser = await this.getUserFromAuth(session.user.id);
+          return { 
+            user: refreshedUser, 
+            newToken: session.access_token 
+          };
+        }
+      } catch (refreshError) {
+        console.warn('Session refresh attempt failed:', refreshError);
+      }
+
+      return { user: null };
+    } catch (error) {
+      console.error('Error validating and refreshing session:', error);
+      return { user: null };
+    }
+  },
 };

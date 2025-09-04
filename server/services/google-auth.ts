@@ -36,7 +36,7 @@ class GoogleAuthService {
     );
   }
 
-  getAuthUrl(): string {
+  getAuthUrl(state?: string): string {
     const scopes = [
       'openid',
       'email',
@@ -45,14 +45,20 @@ class GoogleAuthService {
       'https://www.googleapis.com/auth/meetings.space.created'
     ];
 
-    return this.oauth2Client.generateAuthUrl({
+    const authUrlOptions: any = {
       access_type: 'offline',
       scope: scopes,
       prompt: 'consent'
-    });
+    };
+
+    if (state) {
+      authUrlOptions.state = state;
+    }
+
+    return this.oauth2Client.generateAuthUrl(authUrlOptions);
   }
 
-  async handleCallback(code: string): Promise<{ user: any; token: string }> {
+  async handleCallback(code: string, state?: string): Promise<{ user: any; token: string; isNewUser?: boolean }> {
     try {
       // Exchange code for tokens
       const { tokens } = await this.oauth2Client.getToken(code);
@@ -68,6 +74,7 @@ class GoogleAuthService {
 
       // Check if user exists in our database
       let user = await storage.getUserByEmail(userInfo.email);
+      let isNewUser = false;
       
       if (!user) {
         // Create new user
@@ -78,6 +85,7 @@ class GoogleAuthService {
         };
         
         user = await storage.createUser(userData);
+        isNewUser = true;
         
         // Create default organization for the user
         const orgData: InsertOrganization = {
@@ -91,7 +99,7 @@ class GoogleAuthService {
       // Create Supabase session token
       const token = await supabaseService.createSessionToken(user);
 
-      return { user, token };
+      return { user, token, isNewUser };
     } catch (error) {
       console.error('Google OAuth callback error:', error);
       throw new Error('Failed to authenticate with Google');

@@ -36,10 +36,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Session refresh endpoint for session restore
+  app.post("/api/auth/refresh", async (req, res) => {
+    try {
+      const { token, refreshToken } = req.body;
+      
+      if (!token && !refreshToken) {
+        return res.status(401).json({ message: "Token or refresh token required" });
+      }
+
+      // Try to validate and refresh the session
+      const result = await supabaseService.validateAndRefreshSession(token || refreshToken);
+      
+      if (!result.user) {
+        return res.status(401).json({ message: "Session expired or invalid" });
+      }
+
+      const response: any = { user: result.user };
+      if (result.newToken) {
+        response.newToken = result.newToken;
+      }
+
+      res.json(response);
+    } catch (error) {
+      console.error("Session refresh error:", error);
+      res.status(500).json({ message: "Session refresh failed" });
+    }
+  });
+
             // Google OAuth routes
           app.get("/api/auth/google", async (req, res) => {
             try {
-              const authUrl = googleAuthService.getAuthUrl();
+              const { state } = req.query;
+              const authUrl = googleAuthService.getAuthUrl(state as string);
               res.json({ authUrl });
             } catch (error) {
               console.error("Google OAuth error:", error);
@@ -55,33 +84,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/google/callback", async (req, res) => {
     try {
-      const { code, error } = req.query;
+      const { code, error, state } = req.query;
       
       if (error) {
         console.error("Google OAuth error:", error);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
-        return res.redirect(`${frontendUrl}/login?error=oauth_error`);
+        const redirectPage = state === 'signup' ? 'signup' : 'login';
+        return res.redirect(`${frontendUrl}/${redirectPage}?error=oauth_error`);
       }
       
       if (!code || typeof code !== 'string') {
         console.error("No authorization code received");
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
-        return res.redirect(`${frontendUrl}/login?error=no_code`);
+        const redirectPage = state === 'signup' ? 'signup' : 'login';
+        return res.redirect(`${frontendUrl}/${redirectPage}?error=no_code`);
       }
 
       console.log("Received authorization code:", code.substring(0, 20) + "...");
       
-      const { user, token } = await googleAuthService.handleCallback(code);
+      const { user, token, isNewUser } = await googleAuthService.handleCallback(code, state as string);
       
-      console.log("User authenticated:", user.email);
+      console.log("User authenticated:", user.email, isNewUser ? "(new user)" : "(existing user)");
       
       // Redirect to frontend with token
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
-      res.redirect(`${frontendUrl}/dashboard?token=${token}`);
+      res.redirect(`${frontendUrl}/dashboard?token=${token}${isNewUser ? '&welcome=true' : ''}`);
     } catch (error) {
       console.error("Google OAuth callback error:", error);
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
-      res.redirect(`${frontendUrl}/login?error=callback_failed`);
+      const { state } = req.query;
+      const redirectPage = state === 'signup' ? 'signup' : 'login';
+      res.redirect(`${frontendUrl}/${redirectPage}?error=callback_failed`);
     }
   });
 
@@ -686,11 +719,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Webhook routes
   app.post("/api/webhooks/recall", async (req, res) => {
     try {
-      const event = insertWebhookEventSchema.parse({
+      const event: any = {
         source: "recall_ai",
         eventType: req.body.event || "unknown",
-        payload: req.body,
-      });
+        payload: req.body || {},
+        processed: false,
+      };
 
       const webhookEvent = await storage.createWebhookEvent(event);
       
@@ -839,41 +873,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Bot status error:', error);
       res.status(500).json({ message: 'Failed to get bot status' });
-    }
-  });
-
-  // Recall.ai webhook endpoint
-  app.post('/api/webhooks/recall', async (req, res) => {
-    try {
-      const webhookData = req.body;
-      console.log('📨 Received Recall.ai webhook:', webhookData);
-
-      // Store webhook event in database
-      const webhookEvent = await storage.createWebhookEvent({
-        source: 'recall_ai',
-        eventType: webhookData.event || 'unknown',
-        payload: webhookData,
-        processed: false
-      });
-      console.log('💾 Webhook event stored with ID:', webhookEvent.id);
-
-      // Process the webhook event
-      const { recallAIService } = await import('./services/recall-ai');
-      await recallAIService.processWebhook(webhookData);
-      console.log('✅ Webhook processed with Recall.ai service');
-
-      // Mark webhook as processed
-      await storage.markWebhookEventProcessed(webhookEvent.id);
-      console.log('✅ Webhook event marked as processed');
-
-      res.status(200).json({ success: true, message: 'Webhook processed successfully' });
-    } catch (error) {
-      console.error('❌ Webhook processing error:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Webhook processing failed',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      });
     }
   });
 

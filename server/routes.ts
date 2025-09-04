@@ -495,6 +495,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Fetch transcript from Recall.ai bot endpoint
+  app.post("/api/meetings/:id/fetch-transcript", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const meetingId = req.params.id;
+
+      console.log('📥 Fetching transcript for meeting:', meetingId, 'by user:', user.email);
+
+      // Check if meeting exists and user has access
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Check if meeting has a bot ID
+      if (!meeting.recallBotId) {
+        return res.status(400).json({ message: "No Recall.ai bot associated with this meeting" });
+      }
+
+      // Fetch and store transcript
+      await recallAIService.fetchAndStoreTranscript(meeting.recallBotId, meetingId);
+      
+      // Return updated meeting data
+      const updatedMeeting = await storage.getMeeting(meetingId);
+      console.log('✅ Transcript fetched and stored successfully');
+
+      res.json({ 
+        success: true, 
+        message: "Transcript fetched and stored successfully",
+        meeting: updatedMeeting 
+      });
+    } catch (error) {
+      console.error("❌ Fetch transcript error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Failed to fetch transcript" 
+      });
+    }
+  });
+
   // Integrations routes
   app.get("/api/integrations", authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {

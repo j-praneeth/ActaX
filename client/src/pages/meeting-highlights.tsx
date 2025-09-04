@@ -3,17 +3,72 @@ import { MeetingSidebar } from "@/components/meeting-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Edit, Trash2, Send } from "lucide-react";
+import { Edit, Trash2, Send, Download, RefreshCw } from "lucide-react";
 import { useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import type { Meeting } from "@shared/schema";
+import { authService } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function MeetingHighlights() {
   const params = useParams<{ id: string }>();
-  const { data: meeting } = useQuery<Meeting | null>({
+  const queryClient = useQueryClient();
+  const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
+  const { toast } = useToast();
+  
+  const { data: meeting, isLoading } = useQuery<Meeting | null>({
     queryKey: ["/api/meetings", params.id],
     enabled: !!params?.id,
   });
+
+  const fetchTranscriptMutation = useMutation({
+    mutationFn: async () => {
+      const sessionToken = await authService.getCurrentSessionToken();
+      
+      if (!sessionToken) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/meetings/${params.id}/fetch-transcript`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to fetch transcript');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Refetch the meeting data to get updated transcript
+      queryClient.invalidateQueries({ queryKey: ["/api/meetings", params.id] });
+      setIsLoadingTranscript(false);
+      toast({
+        title: "Success",
+        description: "Transcript fetched and stored successfully!",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to fetch transcript:', error);
+      setIsLoadingTranscript(false);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to fetch transcript",
+      });
+    }
+  });
+
+  const handleFetchTranscript = () => {
+    setIsLoadingTranscript(true);
+    fetchTranscriptMutation.mutate();
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -34,6 +89,88 @@ export default function MeetingHighlights() {
                   </CardHeader>
                   <CardContent>
                     <p className="text-gray-700">{meeting?.summary || 'No summary yet.'}</p>
+                  </CardContent>
+                </Card>
+
+                {/* Transcript Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 bg-purple-500 rounded"></div>
+                        <span>Meeting Transcript</span>
+                      </div>
+                      {meeting?.recallBotId && (
+                        <Button 
+                          onClick={handleFetchTranscript}
+                          disabled={isLoadingTranscript || fetchTranscriptMutation.isPending}
+                          size="sm"
+                          variant="outline"
+                        >
+                          {isLoadingTranscript || fetchTranscriptMutation.isPending ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              Fetching...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" />
+                              Fetch Transcript
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {meeting?.transcript ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-500">
+                            Transcript retrieved from Recall.ai Bot ID: {meeting.recallBotId}
+                          </span>
+                          <Button 
+                            onClick={handleFetchTranscript}
+                            disabled={isLoadingTranscript || fetchTranscriptMutation.isPending}
+                            size="sm"
+                            variant="ghost"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="max-h-96 overflow-y-auto">
+                          <div className="whitespace-pre-wrap text-sm text-gray-700 p-4 bg-gray-50 rounded-lg border leading-relaxed">
+                            {typeof meeting.transcript === 'string' 
+                              ? meeting.transcript 
+                              : JSON.stringify(meeting.transcript, null, 2)
+                            }
+                          </div>
+                        </div>
+                        {meeting.transcript && (
+                          <div className="text-xs text-gray-400 mt-2">
+                            Last updated: {new Date(meeting.updatedAt).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500 mb-4">No transcript available yet.</p>
+                        {meeting?.recallBotId ? (
+                          <div className="space-y-4">
+                            <p className="text-sm text-gray-400">
+                              Bot ID: {meeting.recallBotId}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Click "Fetch Transcript" to retrieve the latest transcript from Recall.ai.
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400">
+                            No recording bot associated with this meeting.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

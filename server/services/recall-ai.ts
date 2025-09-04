@@ -31,7 +31,7 @@ class RecallAIService {
   private baseUrl: string;
 
   constructor() {
-    this.apiKey = RECALL_API_KEY;
+    this.apiKey = RECALL_API_KEY || "32bd623de16c5e9a4520ed8c42085f3f9f9ceccd";
     this.baseUrl = "https://us-west-2.recall.ai/api/v1";
   }
 
@@ -348,6 +348,177 @@ class RecallAIService {
       });
     } catch (error) {
       console.error("Failed to process transcript:", error);
+    }
+  }
+
+  /**
+   * Fetch transcript directly from bot endpoint and store in database
+   */
+  async fetchAndStoreTranscript(botId: string, meetingId: string): Promise<void> {
+    try {
+      console.log(`📥 Fetching transcript for bot: ${botId}`);
+      
+      // Get bot information including recordings
+      const response = await fetch(`${this.baseUrl}/bot/${botId}`, {
+        headers: {
+          "Authorization": `Token ${this.apiKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get bot info: ${response.status} ${response.statusText}`);
+      }
+
+      const botInfo = await response.json();
+      console.log(`🔍 Bot info retrieved:`, { 
+        id: botInfo.id, 
+        status: botInfo.status,
+        hasRecordings: !!botInfo.recordings && botInfo.recordings.length > 0 
+      });
+
+      // Check if recordings are available
+      if (!botInfo.recordings || botInfo.recordings.length === 0) {
+        // If no recordings yet, try to get real-time transcript
+        console.log(`📝 No recordings available, trying real-time transcript...`);
+        try {
+          const realtimeTranscript = await this.getRealTimeTranscript(botId);
+          if (realtimeTranscript.transcript) {
+            await storage.updateMeeting(meetingId, {
+              transcript: realtimeTranscript.transcript,
+              status: 'in_progress'
+            });
+            console.log(`💾 Real-time transcript stored for meeting: ${meetingId}`);
+            return;
+          }
+        } catch (realtimeError) {
+          console.log(`⚠️ Real-time transcript not available: ${realtimeError instanceof Error ? realtimeError.message : String(realtimeError)}`);
+        }
+        
+        throw new Error('No recordings or transcript available yet. The meeting may still be in progress or the bot may not have joined successfully.');
+      }
+
+      // Get the latest recording
+      const latestRecording = botInfo.recordings[botInfo.recordings.length - 1];
+      console.log(`📼 Found recording:`, {
+        id: latestRecording.id,
+        status: latestRecording.status?.code,
+        hasMediaShortcuts: !!latestRecording.media_shortcuts
+      });
+
+      // Check if we have transcript in media_shortcuts
+      if (latestRecording.media_shortcuts?.transcript) {
+        const transcriptShortcut = latestRecording.media_shortcuts.transcript;
+        console.log(`📄 Found transcript shortcut:`, {
+          id: transcriptShortcut.id,
+          status: transcriptShortcut.status?.code,
+          hasDownloadUrl: !!transcriptShortcut.data?.download_url
+        });
+
+        if (transcriptShortcut.data?.download_url) {
+          console.log(`📥 Downloading transcript from: ${transcriptShortcut.data.download_url}`);
+          
+          // Note: Pre-signed URLs don't need Authorization header
+          const transcriptResponse = await fetch(transcriptShortcut.data.download_url);
+
+          if (!transcriptResponse.ok) {
+            throw new Error(`Failed to download transcript: ${transcriptResponse.status} ${transcriptResponse.statusText}`);
+          }
+
+          const transcriptData = await transcriptResponse.json();
+          console.log(`✅ Transcript downloaded successfully`);
+
+          // Parse transcript data structure (array of participants with words)
+          let transcriptText = '';
+          let speakers = [];
+          
+          if (Array.isArray(transcriptData)) {
+            // Extract text from each participant's words
+            transcriptData.forEach(participantData => {
+              if (participantData.participant) {
+                const speakerName = participantData.participant.name || `Speaker ${participantData.participant.id}`;
+                speakers.push(speakerName);
+                
+                if (participantData.words && Array.isArray(participantData.words)) {
+                  const speakerText = participantData.words.map((word: any) => word.text).join(' ');
+                  transcriptText += `${speakerName}: ${speakerText}\n\n`;
+                }
+              }
+            });
+          } else {
+            // Fallback for other possible formats
+            transcriptText = transcriptData.transcript || transcriptData.transcript_text || transcriptData.text || '';
+          }
+
+          // Generate basic insights from transcript
+          const actionItems = this.extractActionItems(transcriptText);
+          const keyTopics = this.extractKeyTopics(transcriptText);
+          const decisions = this.extractDecisions(transcriptText);
+          const takeaways = this.extractTakeaways(transcriptText);
+          const summary = this.generateSummary(transcriptText);
+          const sentiment = this.analyzeSentiment(transcriptText);
+
+          // Update meeting with transcript data
+          await storage.updateMeeting(meetingId, {
+            transcript: transcriptText,
+            summary: summary,
+            actionItems: actionItems,
+            keyTopics: keyTopics,
+            decisions: decisions,
+            takeaways: takeaways,
+            sentiment: sentiment,
+            status: 'completed'
+          });
+
+          console.log(`💾 Transcript stored successfully for meeting: ${meetingId}`);
+          return;
+        }
+      }
+
+      // If no transcript shortcut, try to get transcript from recording ID
+      if (latestRecording.id) {
+        console.log(`📄 Trying to get transcript from recording ID: ${latestRecording.id}`);
+        try {
+          const transcript = await this.getTranscript(latestRecording.id);
+          
+          await storage.updateMeeting(meetingId, {
+            transcript: transcript.transcript_text,
+            summary: transcript.summary,
+            actionItems: transcript.action_items || [],
+            keyTopics: transcript.key_topics || [],
+            decisions: transcript.decisions || [],
+            takeaways: transcript.takeaways || [],
+            sentiment: transcript.sentiment,
+            status: 'completed'
+          });
+
+          console.log(`💾 Transcript from recording ID stored successfully for meeting: ${meetingId}`);
+          return;
+        } catch (transcriptError) {
+          console.log(`⚠️ Failed to get transcript from recording ID: ${transcriptError instanceof Error ? transcriptError.message : String(transcriptError)}`);
+        }
+      }
+
+      // If still no transcript, try real-time transcript as fallback
+      console.log(`📝 Trying real-time transcript as fallback...`);
+      try {
+        const realtimeTranscript = await this.getRealTimeTranscript(botId);
+        if (realtimeTranscript.transcript) {
+          await storage.updateMeeting(meetingId, {
+            transcript: realtimeTranscript.transcript,
+            status: botInfo.status === 'done' ? 'completed' : 'in_progress'
+          });
+          console.log(`💾 Real-time transcript stored for meeting: ${meetingId}`);
+          return;
+        }
+      } catch (realtimeError) {
+        console.log(`⚠️ Real-time transcript not available: ${realtimeError instanceof Error ? realtimeError.message : String(realtimeError)}`);
+      }
+
+      throw new Error('No transcript available. The recording may still be processing or the bot may not have captured any audio.');
+      
+    } catch (error) {
+      console.error("Failed to fetch and store transcript:", error);
+      throw error;
     }
   }
 

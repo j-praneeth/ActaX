@@ -181,15 +181,15 @@ export default function MeetingHighlights() {
                       <div className="text-center py-8">
                         {(isLoadingTranscript || fetchTranscriptMutation.isPending) ? (
                           <div className="space-y-4">
-                            <RefreshCw className="h-8 w-8 animate-spin text-purple-500 mx-auto" />
-                            <p className="text-gray-600">Fetching transcript from Recall.ai...</p>
-                            <p className="text-sm text-gray-400">
+                            {/* <RefreshCw className="h-8 w-8 animate-spin text-purple-500 mx-auto" /> */}
+                            {/* <p className="text-gray-600">Fetching transcript from Recall.ai...</p> */}
+                            {/* <p className="text-sm text-gray-400">
                               Bot ID: {meeting?.recallBotId}
-                            </p>
+                            </p> */}
                           </div>
                         ) : (
                           <div>
-                            <p className="text-gray-500 mb-4">No transcript available yet.</p>
+                            <p className="text-gray-500 mb-4">Retrieving transcript please wait...</p>
                             {meeting?.recallBotId ? (
                               <div className="space-y-4">
                                 <p className="text-sm text-gray-400">
@@ -210,7 +210,7 @@ export default function MeetingHighlights() {
                               </div>
                             ) : (
                               <p className="text-sm text-gray-400">
-                                No recording bot associated with this meeting.
+                                {/* No recording bot associated with this meeting. */}
                               </p>
                             )}
                           </div>

@@ -12,7 +12,7 @@ import {
   CheckCircle, 
   AlertCircle,
   ExternalLink,
-  // Sync,
+  RefreshCw,
   MessageSquare,
   Target,
   Lightbulb,
@@ -288,7 +288,7 @@ export function MeetingDetailsCard({ meeting, onSync }: MeetingDetailsCardProps)
                   disabled={syncing === 'jira'}
                   className="flex items-center space-x-2"
                 >
-                  {/* <Sync className={`w-3 h-3 ${syncing === 'jira' ? 'animate-spin' : ''}`} /> */}
+                  {/* <RefreshCw className={`w-3 h-3 ${syncing === 'jira' ? 'animate-spin' : ''}`} /> */}
                   <span>{syncing === 'jira' ? 'Syncing...' : 'Sync to Jira'}</span>
                 </Button>
                 <Button
@@ -298,7 +298,7 @@ export function MeetingDetailsCard({ meeting, onSync }: MeetingDetailsCardProps)
                   disabled={syncing === 'slack'}
                   className="flex items-center space-x-2"
                 >
-                  <Sync className={`w-3 h-3 ${syncing === 'slack' ? 'animate-spin' : ''}`} />
+                                      <RefreshCw className={`w-3 h-3 ${syncing === 'slack' ? 'animate-spin' : ''}`} />
                   <span>{syncing === 'slack' ? 'Syncing...' : 'Share to Slack'}</span>
                 </Button>
                 <Button
@@ -308,7 +308,7 @@ export function MeetingDetailsCard({ meeting, onSync }: MeetingDetailsCardProps)
                   disabled={syncing === 'notion'}
                   className="flex items-center space-x-2"
                 >
-                  <Sync className={`w-3 h-3 ${syncing === 'notion' ? 'animate-spin' : ''}`} />
+                                      <RefreshCw className={`w-3 h-3 ${syncing === 'notion' ? 'animate-spin' : ''}`} />
                   <span>{syncing === 'notion' ? 'Syncing...' : 'Save to Notion'}</span>
                 </Button>
               </div>

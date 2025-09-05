@@ -35,10 +35,12 @@ export interface IStorage {
   updateMeeting(id: string, updates: Partial<Meeting>): Promise<Meeting>;
   
   // Integrations
+  getIntegration(id: string): Promise<Integration | undefined>;
   getIntegrationsByOrganization(organizationId: string): Promise<Integration[]>;
   getIntegrationByProvider(organizationId: string, provider: string): Promise<Integration | undefined>;
   createIntegration(integration: InsertIntegration): Promise<Integration>;
   updateIntegration(id: string, updates: Partial<Integration>): Promise<Integration>;
+  deleteIntegration(id: string): Promise<void>;
 
   // Agents
   getAgentsByOrganization(organizationId: string): Promise<Agent[]>;
@@ -172,6 +174,10 @@ export class MemStorage implements IStorage {
   }
 
   // Integrations
+  async getIntegration(id: string): Promise<Integration | undefined> {
+    return this.integrations.get(id);
+  }
+
   async getIntegrationsByOrganization(organizationId: string): Promise<Integration[]> {
     return Array.from(this.integrations.values()).filter(integration => integration.organizationId === organizationId);
   }
@@ -210,6 +216,10 @@ export class MemStorage implements IStorage {
     };
     this.integrations.set(id, updatedIntegration);
     return updatedIntegration;
+  }
+
+  async deleteIntegration(id: string): Promise<void> {
+    this.integrations.delete(id);
   }
 
   // Agents

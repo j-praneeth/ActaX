@@ -290,41 +290,25 @@ class OAuthService {
 
   private async syncToJira(meeting: Meeting, accessToken: string): Promise<void> {
     try {
-      // First, get the cloud ID for the Jira instance
-      const cloudId = await this.getJiraCloudId(accessToken);
-      if (!cloudId) {
-        console.error("Failed to get Jira cloud ID");
+      const { jiraService } = await import('./jira');
+      
+      // Get the user's default project (this could be configurable in the future)
+      const projects = await jiraService.getProjects(accessToken);
+      if (projects.length === 0) {
+        console.error("No Jira projects found");
         return;
       }
-
-      // Create a main meeting summary issue
-      const summaryIssue = await this.createJiraIssue(cloudId, accessToken, {
-        summary: `Meeting Summary: ${meeting.title}`,
-        description: this.generateJiraDescription(meeting),
-        issuetype: "Story",
+      
+      // Use the first project as default (in production, this should be user-configurable)
+      const defaultProject = projects[0];
+      
+      await jiraService.syncMeetingToJira(accessToken, meeting, defaultProject.key, {
+        createSummaryIssue: true,
+        createActionItemIssues: true,
+        summaryIssueType: "Story",
+        actionItemIssueType: "Task",
         priority: "Medium"
       });
-
-      // Create action item issues and link them to the summary
-      if (meeting.actionItems && Array.isArray(meeting.actionItems)) {
-        for (const actionItem of meeting.actionItems) {
-          try {
-            const actionIssue = await this.createJiraIssue(cloudId, accessToken, {
-              summary: actionItem,
-              description: `Action item from meeting: ${meeting.title}\n\nMeeting Date: ${meeting.startTime ? new Date(meeting.startTime).toLocaleDateString() : 'N/A'}`,
-              issuetype: "Task",
-              priority: "High"
-            });
-
-            // Link the action item to the summary issue
-            if (summaryIssue && actionIssue) {
-              await this.linkJiraIssues(cloudId, accessToken, summaryIssue.key, actionIssue.key, "relates to");
-            }
-          } catch (error) {
-            console.error("Failed to create Jira action item issue:", error);
-          }
-        }
-      }
     } catch (error) {
       console.error("Failed to sync meeting to Jira:", error);
     }

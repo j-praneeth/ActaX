@@ -248,6 +248,19 @@ export class PrismaStorage implements IStorage {
     });
   }
 
+  async getIntegration(id: string): Promise<Integration | undefined> {
+    const integration = await prisma.integration.findUnique({
+      where: { id }
+    });
+    return integration || undefined;
+  }
+
+  async deleteIntegration(id: string): Promise<void> {
+    await prisma.integration.delete({
+      where: { id }
+    });
+  }
+
   // Agents
   async getAgentsByOrganization(organizationId: string): Promise<Agent[]> {
     return await prisma.agent.findMany({

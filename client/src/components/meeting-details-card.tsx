@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { safeFetch } from '@/lib/safe-fetch';
 import { authService } from '@/lib/auth';
+import { JiraSyncModal } from './jira-sync-modal';
 
 interface MeetingDetailsCardProps {
   meeting: {
@@ -46,6 +47,7 @@ interface MeetingDetailsCardProps {
 
 export function MeetingDetailsCard({ meeting, onSync }: MeetingDetailsCardProps) {
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [isJiraSyncModalOpen, setIsJiraSyncModalOpen] = useState(false);
   const { toast } = useToast();
 
   const getStatusColor = (status: string) => {
@@ -77,6 +79,11 @@ export function MeetingDetailsCard({ meeting, onSync }: MeetingDetailsCardProps)
   };
 
   const handleSync = async (provider: string) => {
+    if (provider === 'jira') {
+      setIsJiraSyncModalOpen(true);
+      return;
+    }
+
     setSyncing(provider);
     try {
       const sessionToken = await authService.getCurrentSessionToken();
@@ -288,8 +295,8 @@ export function MeetingDetailsCard({ meeting, onSync }: MeetingDetailsCardProps)
                   disabled={syncing === 'jira'}
                   className="flex items-center space-x-2"
                 >
-                  {/* <RefreshCw className={`w-3 h-3 ${syncing === 'jira' ? 'animate-spin' : ''}`} /> */}
-                  <span>{syncing === 'jira' ? 'Syncing...' : 'Sync to Jira'}</span>
+                  <Target className="w-3 h-3" />
+                  <span>Sync to Jira</span>
                 </Button>
                 <Button
                   size="sm"
@@ -331,6 +338,17 @@ export function MeetingDetailsCard({ meeting, onSync }: MeetingDetailsCardProps)
           </div>
         )}
       </CardContent>
+
+      {/* Jira Sync Modal */}
+      <JiraSyncModal
+        isOpen={isJiraSyncModalOpen}
+        onClose={() => setIsJiraSyncModalOpen(false)}
+        meeting={meeting}
+        onSyncComplete={() => {
+          setIsJiraSyncModalOpen(false);
+          onSync?.('jira');
+        }}
+      />
     </Card>
   );
 }

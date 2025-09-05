@@ -716,6 +716,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/integrations/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const integrationId = req.params.id;
+      const integration = await storage.getIntegration(integrationId);
+      
+      if (!integration) {
+        return res.status(404).json({ message: "Integration not found" });
+      }
+
+      // Check if user has access to this integration
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === integration.organizationId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await storage.deleteIntegration(integrationId);
+      
+      res.json({ success: true, message: "Integration disconnected successfully" });
+    } catch (error) {
+      console.error("Delete integration error:", error);
+      res.status(500).json({ message: "Failed to disconnect integration" });
+    }
+  });
+
+  // Jira-specific integration routes
+  app.get("/api/integrations/jira/projects", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const integration = await storage.getIntegrationByProvider(organizations[0].id, "jira");
+      if (!integration || !integration.isActive) {
+        return res.status(400).json({ message: "Jira integration not found or inactive" });
+      }
+
+      const accessToken = await oauthService.getDecryptedAccessToken(integration);
+      const { jiraService } = await import('./services/jira');
+      const projects = await jiraService.getProjects(accessToken);
+      
+      res.json(projects);
+    } catch (error) {
+      console.error("Get Jira projects error:", error);
+      res.status(500).json({ message: "Failed to fetch Jira projects" });
+    }
+  });
+
+  app.get("/api/integrations/jira/boards", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const { projectKey } = req.query;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const integration = await storage.getIntegrationByProvider(organizations[0].id, "jira");
+      if (!integration || !integration.isActive) {
+        return res.status(400).json({ message: "Jira integration not found or inactive" });
+      }
+
+      const accessToken = await oauthService.getDecryptedAccessToken(integration);
+      const { jiraService } = await import('./services/jira');
+      const boards = await jiraService.getBoards(accessToken, projectKey as string);
+      
+      res.json(boards);
+    } catch (error) {
+      console.error("Get Jira boards error:", error);
+      res.status(500).json({ message: "Failed to fetch Jira boards" });
+    }
+  });
+
+  app.get("/api/integrations/jira/boards/:boardId/issues", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const { boardId } = req.params;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const integration = await storage.getIntegrationByProvider(organizations[0].id, "jira");
+      if (!integration || !integration.isActive) {
+        return res.status(400).json({ message: "Jira integration not found or inactive" });
+      }
+
+      const accessToken = await oauthService.getDecryptedAccessToken(integration);
+      const { jiraService } = await import('./services/jira');
+      const issues = await jiraService.getBoardIssues(accessToken, parseInt(boardId));
+      
+      res.json(issues);
+    } catch (error) {
+      console.error("Get board issues error:", error);
+      res.status(500).json({ message: "Failed to fetch board issues" });
+    }
+  });
+
+  app.get("/api/integrations/jira/projects/:projectKey/issue-types", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const { projectKey } = req.params;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const integration = await storage.getIntegrationByProvider(organizations[0].id, "jira");
+      if (!integration || !integration.isActive) {
+        return res.status(400).json({ message: "Jira integration not found or inactive" });
+      }
+
+      const accessToken = await oauthService.getDecryptedAccessToken(integration);
+      const { jiraService } = await import('./services/jira');
+      const issueTypes = await jiraService.getIssueTypes(accessToken, projectKey);
+      
+      res.json(issueTypes);
+    } catch (error) {
+      console.error("Get issue types error:", error);
+      res.status(500).json({ message: "Failed to fetch issue types" });
+    }
+  });
+
+  app.get("/api/integrations/jira/priorities", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      
+      if (organizations.length === 0) {
+        return res.status(400).json({ message: "No organization found" });
+      }
+
+      const integration = await storage.getIntegrationByProvider(organizations[0].id, "jira");
+      if (!integration || !integration.isActive) {
+        return res.status(400).json({ message: "Jira integration not found or inactive" });
+      }
+
+      const accessToken = await oauthService.getDecryptedAccessToken(integration);
+      const { jiraService } = await import('./services/jira');
+      const priorities = await jiraService.getPriorities(accessToken);
+      
+      res.json(priorities);
+    } catch (error) {
+      console.error("Get priorities error:", error);
+      res.status(500).json({ message: "Failed to fetch priorities" });
+    }
+  });
+
+  app.post("/api/meetings/:id/sync/jira", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const meetingId = req.params.id;
+      const { projectKey, options } = req.body;
+
+      if (!projectKey) {
+        return res.status(400).json({ message: "Project key is required" });
+      }
+
+      // Check if meeting exists and user has access
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const integration = await storage.getIntegrationByProvider(organizations[0].id, "jira");
+      if (!integration || !integration.isActive) {
+        return res.status(400).json({ message: "Jira integration not found or inactive" });
+      }
+
+      const accessToken = await oauthService.getDecryptedAccessToken(integration);
+      const { jiraService } = await import('./services/jira');
+      const result = await jiraService.syncMeetingToJira(accessToken, meeting, projectKey, options);
+      
+      res.json({ 
+        success: true, 
+        message: "Meeting synced to Jira successfully",
+        result 
+      });
+    } catch (error) {
+      console.error("Sync to Jira error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to sync to Jira" 
+      });
+    }
+  });
+
   // Webhook routes
   app.post("/api/webhooks/recall", async (req, res) => {
     try {

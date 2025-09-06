@@ -19,6 +19,11 @@ interface QuestionAnswer {
   timestamp: Date;
 }
 
+interface Participant {
+  id: string;
+  name: string;
+}
+
 export default function MeetingHighlights() {
   const params = useParams<{ id: string }>();
   const queryClient = useQueryClient();
@@ -31,6 +36,68 @@ export default function MeetingHighlights() {
     queryKey: ["/api/meetings", params.id],
     enabled: !!params?.id,
   });
+
+  // Extract participants from transcript
+  const extractParticipantsFromTranscript = (transcript: any): Participant[] => {
+    const participants: Participant[] = [];
+    
+    if (typeof transcript === 'string') {
+      // Parse transcript string to extract speaker names
+      // Look for patterns like "Speaker Name: text" or "Name: text"
+      const lines = transcript.split('\n');
+      const speakerSet = new Set<string>();
+      
+      lines.forEach(line => {
+        const trimmedLine = line.trim();
+        if (trimmedLine && trimmedLine.includes(':')) {
+          const colonIndex = trimmedLine.indexOf(':');
+          const potentialSpeaker = trimmedLine.substring(0, colonIndex).trim();
+          
+          // Filter out common non-speaker patterns
+          if (potentialSpeaker && 
+              !potentialSpeaker.toLowerCase().includes('speaker') &&
+              !potentialSpeaker.match(/^\d+$/) && // not just numbers
+              potentialSpeaker.length > 1 &&
+              potentialSpeaker.length < 50) {
+            speakerSet.add(potentialSpeaker);
+          }
+        }
+      });
+      
+      // Convert to participants array
+      Array.from(speakerSet).forEach((name, index) => {
+        participants.push({
+          id: `speaker-${index}`,
+          name: name
+        });
+      });
+    } else if (Array.isArray(transcript)) {
+      // Handle array format (if transcript is structured data)
+      const speakerSet = new Set<string>();
+      
+      transcript.forEach((item: any) => {
+        if (item.participant && item.participant.name) {
+          speakerSet.add(item.participant.name);
+        } else if (item.speaker) {
+          speakerSet.add(item.speaker);
+        } else if (item.name) {
+          speakerSet.add(item.name);
+        }
+      });
+      
+      Array.from(speakerSet).forEach((name, index) => {
+        participants.push({
+          id: `speaker-${index}`,
+          name: name
+        });
+      });
+    }
+    
+    return participants;
+  };
+
+  // Get participants from transcript
+  const participants = meeting?.transcript ? extractParticipantsFromTranscript(meeting.transcript) : [];
 
   const fetchTranscriptMutation = useMutation({
     mutationFn: async () => {
@@ -577,7 +644,7 @@ export default function MeetingHighlights() {
 
               {/* Right Column - Sidebar */}
               <div className="space-y-8">
-                {/* Participants - dynamic when available */}
+                {/* Participants */}
                 <Card className="mt-16">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
@@ -585,7 +652,22 @@ export default function MeetingHighlights() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-sm text-gray-600">Participants data not available.</div>
+                    {participants.length > 0 ? (
+                      <div className="space-y-2">
+                        {participants.map((participant) => (
+                          <div key={participant.id} className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
+                            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                              {participant.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-sm text-gray-700">{participant.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-600">
+                        {meeting?.transcript ? 'No participants detected in transcript.' : 'Participants will be available once transcript is processed.'}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

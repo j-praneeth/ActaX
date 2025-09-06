@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { supabaseService } from "./services/supabase";
 import { recallAIService } from "./services/recall-ai";
+import { geminiService } from "./services/gemini";
 import { oauthService } from "./services/oauth";
 import { googleAuthService } from "./services/google-auth";
 import { authMiddleware, type AuthenticatedRequest } from "./middleware/auth";
@@ -1075,6 +1076,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Bot status error:', error);
       res.status(500).json({ message: 'Failed to get bot status' });
+    }
+  });
+
+  // Ask question about meeting content
+  app.post('/api/meetings/:id/ask-question', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { question } = req.body;
+
+      if (!question || typeof question !== 'string') {
+        return res.status(400).json({ error: 'Question is required' });
+      }
+
+      // Get meeting data
+      const meeting = await storage.getMeeting(id);
+
+      if (!meeting) {
+        return res.status(404).json({ error: 'Meeting not found' });
+      }
+
+      if (!meeting.transcript) {
+        return res.status(400).json({ error: 'No transcript available for this meeting' });
+      }
+
+      // Use Gemini to answer the question
+      const answer = await geminiService.answerQuestion(meeting.transcript, question);
+
+      res.json({ answer });
+    } catch (error) {
+      console.error('Error answering question:', error);
+      res.status(500).json({ error: 'Failed to answer question' });
     }
   });
 

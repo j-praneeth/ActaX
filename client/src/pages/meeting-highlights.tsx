@@ -3,7 +3,7 @@ import { MeetingSidebar } from "@/components/meeting-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Edit, Trash2, Send, Download, RefreshCw, ArrowLeft } from "lucide-react";
+import { Edit, Trash2, Send, Download, RefreshCw, ArrowLeft, Bot, User } from "lucide-react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
@@ -12,10 +12,19 @@ import { authService } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 
+interface QuestionAnswer {
+  id: string;
+  question: string;
+  answer: string;
+  timestamp: Date;
+}
+
 export default function MeetingHighlights() {
   const params = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [qaHistory, setQaHistory] = useState<QuestionAnswer[]>([]);
   const { toast } = useToast();
 
   const { data: meeting, isLoading } = useQuery<Meeting | null>({
@@ -112,9 +121,77 @@ export default function MeetingHighlights() {
     }
   });
 
+  const askQuestionMutation = useMutation({
+    mutationFn: async (questionText: string) => {
+      const sessionToken = await authService.getCurrentSessionToken();
+
+      if (!sessionToken) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/meetings/${params.id}/ask-question`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ question: questionText }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to get answer');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const newQA: QuestionAnswer = {
+        id: Date.now().toString(),
+        question: question,
+        answer: data.answer,
+        timestamp: new Date(),
+      };
+      setQaHistory(prev => [...prev, newQA]);
+      setQuestion("");
+      // toast({
+      //   title: "Answer Generated",
+      //   description: "AI has provided an answer to your question!",
+      // });
+    },
+    onError: (error) => {
+      console.error('Failed to get answer:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to get answer",
+      });
+    }
+  });
+
   const handleFetchTranscript = () => {
     setIsLoadingTranscript(true);
     fetchTranscriptMutation.mutate();
+  };
+
+  const handleAskQuestion = () => {
+    if (!question.trim()) return;
+    if (!meeting?.transcript) {
+      toast({
+        variant: "destructive",
+        title: "No Transcript Available",
+        description: "Please wait for the transcript to be processed before asking questions.",
+      });
+      return;
+    }
+    askQuestionMutation.mutate(question);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAskQuestion();
+    }
   };
 
   // Automatically fetch transcript when page loads if not available
@@ -512,15 +589,22 @@ export default function MeetingHighlights() {
                   </CardContent>
                 </Card>
 
-                {/* Ask Section
+                {/* Ask Section */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Ask?</CardTitle>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Bot className="h-5 w-5 text-blue-500" />
+                      <span>Ask AI Assistant</span>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {[(meeting?.title && `What are the next steps for ${meeting.title}?`) || 'What are the next steps?'].map((question, index) => (
-                        <div key={index} className="p-3 bg-gray-50 rounded-lg border cursor-pointer hover:bg-gray-100 transition-colors">
+                      {[].map((question, index) => (
+                        <div 
+                          key={index} 
+                          className="p-3 bg-gray-50 rounded-lg border cursor-pointer hover:bg-gray-100 transition-colors"
+                          onClick={() => setQuestion(question)}
+                        >
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-700">{question}</span>
                             <div className="w-4 h-4 border-l-2 border-b-2 border-gray-400 transform rotate-45"></div>
@@ -532,16 +616,57 @@ export default function MeetingHighlights() {
                     <div className="mt-4">
                       <div className="flex space-x-2">
                         <Input
-                          placeholder="Ask anything about meeting..."
+                          placeholder="Ask anything about this meeting..."
                           className="flex-1"
+                          value={question}
+                          onChange={(e) => setQuestion(e.target.value)}
+                          onKeyPress={handleKeyPress}
+                          disabled={askQuestionMutation.isPending || !meeting?.transcript}
                         />
-                        <Button size="sm">
-                          <Send className="h-4 w-4" />
+                        <Button 
+                          size="sm"
+                          onClick={handleAskQuestion}
+                          disabled={askQuestionMutation.isPending || !question.trim() || !meeting?.transcript}
+                        >
+                          {askQuestionMutation.isPending ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
                     </div>
+
+                    {/* Q&A History */}
+                    {qaHistory.length > 0 && (
+                      <div className="mt-6 space-y-4">
+                        <h4 className="text-sm font-medium text-gray-700">Recent Questions & Answers</h4>
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                          {qaHistory.map((qa) => (
+                            <div key={qa.id} className="space-y-2">
+                              <div className="flex items-start space-x-2">
+                                <User className="h-4 w-4 text-gray-500 mt-1 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg">
+                                    {qa.question}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-start space-x-2">
+                                <Bot className="h-4 w-4 text-blue-500 mt-1 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <p className="text-sm text-gray-600 bg-blue-50 p-2 rounded-lg">
+                                    {qa.answer}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
-                </Card> */}
+                </Card>
               </div>
             </div>
           </div>

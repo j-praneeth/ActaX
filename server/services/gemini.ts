@@ -85,6 +85,39 @@ Respond only with valid JSON, no additional text.
   }
 
   /**
+   * Answer a question about meeting content
+   */
+  async answerQuestion(transcript: string, question: string): Promise<string> {
+    if (!this.isAvailable()) {
+      throw new Error('Gemini API key not configured');
+    }
+
+    try {
+      const prompt = `
+You are an AI assistant helping users understand meeting content. Based on the following meeting transcript, please answer the user's question in a helpful and concise manner.
+
+Meeting Transcript:
+${transcript}
+
+User Question: ${question}
+
+Please provide a clear, helpful answer based on the meeting content. If the question cannot be answered from the transcript, please say so politely.
+`;
+
+      console.log('🤖 Answering question with Gemini...');
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      console.log('✅ Question answered successfully');
+      return text.trim();
+    } catch (error) {
+      console.error('❌ Failed to answer question with Gemini:', error);
+      throw new Error('Failed to get answer from AI');
+    }
+  }
+
+  /**
    * Fallback analysis when Gemini is not available
    */
   private fallbackAnalysis(transcript: string): MeetingInsights {

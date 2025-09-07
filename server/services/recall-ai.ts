@@ -27,6 +27,22 @@ export interface RecallTranscript {
   sentiment?: string;
 }
 
+export interface RecallParticipant {
+  id: number;
+  name: string;
+  is_host: boolean;
+  platform: string;
+  extra_data?: {
+    zoom?: {
+      conf_user_id: string;
+      user_guid: string;
+      guest: boolean;
+      os: number;
+    };
+  };
+  email?: string | null;
+}
+
 class RecallAIService {
   private apiKey: string;
   private baseUrl: string;
@@ -532,6 +548,81 @@ class RecallAIService {
       
     } catch (error) {
       console.error("Failed to fetch and store transcript:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch participants from Recall.ai bot data
+   */
+  async getParticipants(botId: string): Promise<RecallParticipant[]> {
+    try {
+      console.log(`👥 Fetching participants for bot: ${botId}`);
+      
+      // Get bot information including recordings
+      const response = await fetch(`${this.baseUrl}/bot/${botId}`, {
+        headers: {
+          "Authorization": `Token ${this.apiKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get bot info: ${response.status} ${response.statusText}`);
+      }
+
+      const botInfo = await response.json();
+      console.log(`🔍 Bot info retrieved for participants:`, { 
+        id: botInfo.id, 
+        status: botInfo.status,
+        hasRecordings: !!botInfo.recordings && botInfo.recordings.length > 0 
+      });
+
+      // Check if recordings are available
+      if (!botInfo.recordings || botInfo.recordings.length === 0) {
+        console.log(`📝 No recordings available for participants`);
+        return [];
+      }
+
+      // Get the latest recording
+      const latestRecording = botInfo.recordings[botInfo.recordings.length - 1];
+      console.log(`📼 Found recording for participants:`, {
+        id: latestRecording.id,
+        status: latestRecording.status?.code,
+        hasMediaShortcuts: !!latestRecording.media_shortcuts,
+        hasParticipantEvents: !!latestRecording.media_shortcuts?.participant_events
+      });
+
+      // Check if we have participants in media_shortcuts
+      if (latestRecording.media_shortcuts?.participant_events) {
+        const participantsShortcut = latestRecording.media_shortcuts.participant_events;
+        console.log(`👥 Found participants shortcut:`, {
+          id: participantsShortcut.id,
+          status: participantsShortcut.status?.code,
+          hasDownloadUrl: !!participantsShortcut.data?.participants_download_url
+        });
+
+        if (participantsShortcut.data?.participants_download_url) {
+          console.log(`📥 Downloading participants from: ${participantsShortcut.data.participants_download_url}`);
+          
+          // Download participants data (pre-signed URL doesn't need Authorization header)
+          const participantsResponse = await fetch(participantsShortcut.data.participants_download_url);
+
+          if (!participantsResponse.ok) {
+            throw new Error(`Failed to download participants: ${participantsResponse.status} ${participantsResponse.statusText}`);
+          }
+
+          const participantsData = await participantsResponse.json();
+          console.log(`✅ Participants downloaded successfully:`, participantsData.length, 'participants found');
+          
+          return participantsData as RecallParticipant[];
+        }
+      }
+
+      console.log(`⚠️ No participants data available`);
+      return [];
+      
+    } catch (error) {
+      console.error("Failed to fetch participants:", error);
       throw error;
     }
   }

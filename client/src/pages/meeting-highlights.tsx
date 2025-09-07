@@ -3,7 +3,7 @@ import { MeetingSidebar } from "@/components/meeting-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Edit, Trash2, Send, Download, RefreshCw, ArrowLeft, Bot, User } from "lucide-react";
+import { Edit, Trash2, Send, Download, RefreshCw, ArrowLeft, Bot, User, Monitor } from "lucide-react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
@@ -11,6 +11,7 @@ import type { Meeting } from "@shared/schema";
 import { authService } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+
 
 interface QuestionAnswer {
   id: string;
@@ -20,9 +21,24 @@ interface QuestionAnswer {
 }
 
 interface Participant {
-  id: string;
+  id: number;
   name: string;
   is_host: boolean;
+  platform: string;
+  extra_data?: {
+    zoom?: {
+      conf_user_id: string;
+      user_guid: string;
+      guest: boolean;
+      os: number;
+    };
+    google_meet?: {
+      name: string;
+    };
+    microsoft_teams?: {
+      name: string;
+    };
+  };
 }
 
 export default function MeetingHighlights() {
@@ -31,6 +47,8 @@ export default function MeetingHighlights() {
   const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
   const [question, setQuestion] = useState("");
   const [qaHistory, setQaHistory] = useState<QuestionAnswer[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [isLoadingParticipants, setIsLoadingParticipants] = useState(false);
   const { toast } = useToast();
 
   const { data: meeting, isLoading } = useQuery<Meeting | null>({
@@ -41,42 +59,43 @@ export default function MeetingHighlights() {
   // Extract participants from transcript
   const extractParticipantsFromTranscript = (transcript: any): Participant[] => {
     const participants: Participant[] = [];
-    
+
     if (typeof transcript === 'string') {
       // Parse transcript string to extract speaker names
       // Look for patterns like "Speaker Name: text" or "Name: text"
       const lines = transcript.split('\n');
       const speakerSet = new Set<string>();
-      
+
       lines.forEach(line => {
         const trimmedLine = line.trim();
         if (trimmedLine && trimmedLine.includes(':')) {
           const colonIndex = trimmedLine.indexOf(':');
           const potentialSpeaker = trimmedLine.substring(0, colonIndex).trim();
-          
+
           // Filter out common non-speaker patterns
-          if (potentialSpeaker && 
-              !potentialSpeaker.toLowerCase().includes('speaker') &&
-              !potentialSpeaker.match(/^\d+$/) && // not just numbers
-              potentialSpeaker.length > 1 &&
-              potentialSpeaker.length < 50) {
+          if (potentialSpeaker &&
+            !potentialSpeaker.toLowerCase().includes('speaker') &&
+            !potentialSpeaker.match(/^\d+$/) && // not just numbers
+            potentialSpeaker.length > 1 &&
+            potentialSpeaker.length < 50) {
             speakerSet.add(potentialSpeaker);
           }
         }
       });
-      
+
       // Convert to participants array
       Array.from(speakerSet).forEach((name, index) => {
         participants.push({
-          id: `speaker-${index}`,
+          id: index + 1,
           name: name,
-          is_host: false
+          is_host: false,
+          platform: 'unknown',
         });
       });
     } else if (Array.isArray(transcript)) {
       // Handle array format (if transcript is structured data)
       const speakerSet = new Set<string>();
-      
+
       transcript.forEach((item: any) => {
         if (item.participant && item.participant.name) {
           speakerSet.add(item.participant.name);
@@ -86,20 +105,70 @@ export default function MeetingHighlights() {
           speakerSet.add(item.name);
         }
       });
-      
+
       Array.from(speakerSet).forEach((name, index) => {
         participants.push({
-          id: `speaker-${index}`,
-          name: name
+          id: index + 1,
+          name: name,
+          is_host: false,
+          platform: 'unknown',
         });
       });
     }
-    
+
     return participants;
   };
 
-  // Get participants from transcript
-  const participants = meeting?.transcript ? extractParticipantsFromTranscript(meeting.transcript) : [];
+  // Fetch participants from API
+  const fetchParticipants = async () => {
+    if (!meeting?.recallBotId) return;
+
+    setIsLoadingParticipants(true);
+    try {
+      const sessionToken = await authService.getCurrentSessionToken();
+      if (!sessionToken) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/meetings/${params.id}/participants`, {
+        headers: {
+          'Authorization': `Bearer ${sessionToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch participants: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setParticipants(data.participants || []);
+    } catch (error) {
+      console.error('Failed to fetch participants:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch participants. Falling back to transcript parsing.",
+        variant: "destructive",
+      });
+
+      // Fallback to transcript parsing
+      if (meeting?.transcript) {
+        setParticipants(extractParticipantsFromTranscript(meeting.transcript));
+      }
+    } finally {
+      setIsLoadingParticipants(false);
+    }
+  };
+
+  // Fetch participants when meeting data is available
+  useEffect(() => {
+    if (meeting?.recallBotId) {
+      fetchParticipants();
+    } else if (meeting?.transcript) {
+      // Fallback to transcript parsing if no bot ID
+      setParticipants(extractParticipantsFromTranscript(meeting.transcript));
+    }
+  }, [meeting?.recallBotId, meeting?.transcript]);
 
   const fetchTranscriptMutation = useMutation({
     mutationFn: async () => {
@@ -263,6 +332,19 @@ export default function MeetingHighlights() {
     }
   };
 
+  const getPlatform = (participant: Participant) => {
+    if (participant.extra_data?.zoom) {
+      return "zoom";
+    }
+    if (participant.extra_data?.google_meet) {
+      return "google_meet";
+    }
+    if (participant.extra_data?.microsoft_teams) {
+      return "microsoft_teams";
+    }
+    return "unknown";
+  };
+
   // Automatically fetch transcript when page loads if not available
   useEffect(() => {
     if (meeting && meeting.recallBotId && !meeting.transcript && !isLoadingTranscript && !fetchTranscriptMutation.isPending) {
@@ -319,8 +401,8 @@ export default function MeetingHighlights() {
 
                 <Link href="/dashboard" className="flex items-center space-x-2 gap-2  p-2 w-fit mb-4">
                   <Button size="sm"
-                      variant="outline"
-                      className="relative right-0"><ArrowLeft className="h-5 w-5 text-gray-600 hover:text-gray-900 cursor-pointer" /> Back</Button>
+                    variant="outline"
+                    className="relative right-0"><ArrowLeft className="h-5 w-5 text-gray-600 hover:text-gray-900 cursor-pointer" /> Back</Button>
                 </Link>
                 {/* Transcript Section */}
                 <Card>
@@ -446,7 +528,7 @@ export default function MeetingHighlights() {
                           <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
                         )}
                       </div>
-                      
+
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -534,7 +616,7 @@ export default function MeetingHighlights() {
                           <RefreshCw className="h-4 w-4 animate-spin text-yellow-500" />
                         )}
                       </div>
-                      
+
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -594,7 +676,7 @@ export default function MeetingHighlights() {
                           <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
                         )}
                       </div>
-                      
+
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -650,24 +732,90 @@ export default function MeetingHighlights() {
                 <Card className="mt-16">
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span>Participants</span>
+                      <span>Participants ({participants.length})</span>
+                      {/* <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={fetchParticipants}
+                        disabled={isLoadingParticipants || !meeting?.recallBotId}
+                        className="flex items-center space-x-2"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isLoadingParticipants ? 'animate-spin' : ''}`} />
+                        <span>Refresh</span>
+                      </Button> */}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {participants.length > 0 ? (
-                      <div className="space-y-2">
+                    {isLoadingParticipants ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+                        <span className="ml-2 text-sm text-gray-600">Loading participants...</span>
+                      </div>
+                    ) : participants.length > 0 ? (
+                      <div className="space-y-3">
                         {participants.map((participant) => (
-                          <div key={participant.id} className="flex items-center space-x-3 p-2 bg-gray-50 rounded-lg">
-                            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                          <div key={participant.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${participant.is_host ? 'bg-blue-500' : 'bg-blue-500'
+                              }`}>
                               {participant.name.charAt(0).toUpperCase()}
                             </div>
-                            <span className="text-sm text-gray-700">{participant.name}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm font-medium text-gray-900 truncate">
+                                  {participant.name}
+                                </span>
+                                {participant.is_host && (
+                                  <div className="flex items-center space-x-1 bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">
+                                    <User className="h-3 w-3" />
+                                    <span className="font-medium">{participant.is_host ? 'Host' : 'Member'}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {participant.extra_data && (
+                              <div className="text-xs text-gray-400">
+                                <div className="text-center flex flex-col items-center">
+                                  <div className="w-6 h-6 rounded flex justify-center items-center">
+                                    {/* <Monitor className="h-3 w-3 text-blue-600" /> */}
+                                    
+                                      {participant.extra_data.zoom ? <img src='../../public/icons8-zoom-48.png' alt="Zoom" className="h-6 w-6" /> : participant.extra_data.google_meet ? <img src='../../public/icons8-google-meet-48.png' alt="Google Meet" className="h-6 w-6" /> : participant.extra_data.microsoft_teams ? <img src="../../public/icons8-microsoft-teams-48.png" alt="Microsoft Teams" className="h-6 w-6" /> : <span>Unknown</span>}
+                                    
+                                  </div>
+                                  <span className="mt-1 block">
+                                    {participant.extra_data.zoom
+                                      ? "Zoom"
+                                      : participant.extra_data.google_meet
+                                        ? "Google Meet"
+                                        : participant.extra_data.microsoft_teams
+                                          ? "Microsoft Teams"
+                                          : "Unknown"}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-600">
-                        {meeting?.transcript ? 'No participants detected in transcript.' : 'Participants will be available once transcript is processed.'}
+                      <div className="text-center py-8">
+                        <User className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                        <div className="text-sm text-gray-600">
+                          {meeting?.recallBotId
+                            ? 'No participants found. The meeting may still be in progress or participants data may not be available yet.'
+                            : 'Participants will be available once the meeting is processed.'
+                          }
+                        </div>
+                        {meeting?.recallBotId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={fetchParticipants}
+                            className="mt-3"
+                          >
+                            Try Again
+                          </Button>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -684,8 +832,8 @@ export default function MeetingHighlights() {
                   <CardContent>
                     <div className="space-y-3">
                       {[].map((question, index) => (
-                        <div 
-                          key={index} 
+                        <div
+                          key={index}
                           className="p-3 bg-gray-50 rounded-lg border cursor-pointer hover:bg-gray-100 transition-colors"
                           onClick={() => setQuestion(question)}
                         >
@@ -707,7 +855,7 @@ export default function MeetingHighlights() {
                           onKeyPress={handleKeyPress}
                           disabled={askQuestionMutation.isPending || !meeting?.transcript}
                         />
-                        <Button 
+                        <Button
                           size="sm"
                           onClick={handleAskQuestion}
                           disabled={askQuestionMutation.isPending || !question.trim() || !meeting?.transcript}

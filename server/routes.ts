@@ -1150,6 +1150,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get meeting participants
+  app.get('/api/meetings/:id/participants', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const meeting = await storage.getMeeting(id);
+
+      if (!meeting) {
+        return res.status(404).json({ message: 'Meeting not found' });
+      }
+
+      // Get bot ID from meeting recallBotId field
+      const botId = meeting.recallBotId;
+      if (!botId) {
+        return res.status(404).json({ message: 'No bot found for this meeting' });
+      }
+
+      // Get participants from Recall.ai
+      const { recallAIService } = await import('./services/recall-ai');
+      const participants = await recallAIService.getParticipants(botId);
+      
+      res.json({
+        meetingId: id,
+        participants,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Participants error:', error);
+      res.status(500).json({ message: 'Failed to get participants' });
+    }
+  });
+
   // Ask question about meeting content
   app.post('/api/meetings/:id/ask-question', async (req, res) => {
     try {

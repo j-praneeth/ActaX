@@ -3,6 +3,7 @@ import { MeetingSidebar } from "@/components/meeting-sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EditableTableList } from "@/components/ui/editable-list";
 import { Edit, Trash2, Send, Download, RefreshCw, ArrowLeft, Bot, User, Monitor } from "lucide-react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -307,6 +308,132 @@ export default function MeetingHighlights() {
     }
   });
 
+  // Mutation for updating action items
+  const updateActionItemsMutation = useMutation({
+    mutationFn: async (actionItems: string[]) => {
+      const sessionToken = await authService.getCurrentSessionToken();
+
+      if (!sessionToken) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/meetings/${params.id}/action-items`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ actionItems }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update action items');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meetings", params.id] });
+      toast({
+        title: "Action Items Updated",
+        description: "Action items have been updated successfully!",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to update action items:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update action items",
+      });
+    }
+  });
+
+  // Mutation for updating key topics
+  const updateKeyTopicsMutation = useMutation({
+    mutationFn: async (keyTopics: string[]) => {
+      const sessionToken = await authService.getCurrentSessionToken();
+
+      if (!sessionToken) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/meetings/${params.id}/key-topics`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ keyTopics }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update key topics');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meetings", params.id] });
+      toast({
+        title: "Key Topics Updated",
+        description: "Key topics have been updated successfully!",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to update key topics:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update key topics",
+      });
+    }
+  });
+
+  // Mutation for updating takeaways
+  const updateTakeawaysMutation = useMutation({
+    mutationFn: async (takeaways: string[]) => {
+      const sessionToken = await authService.getCurrentSessionToken();
+
+      if (!sessionToken) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`/api/meetings/${params.id}/takeaways`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+        },
+        body: JSON.stringify({ takeaways }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update takeaways');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/meetings", params.id] });
+      toast({
+        title: "Takeaways Updated",
+        description: "Key takeaways have been updated successfully!",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to update takeaways:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update takeaways",
+      });
+    }
+  });
+
   const handleFetchTranscript = () => {
     setIsLoadingTranscript(true);
     fetchTranscriptMutation.mutate();
@@ -330,6 +457,40 @@ export default function MeetingHighlights() {
       e.preventDefault();
       handleAskQuestion();
     }
+  };
+
+  // Helper functions to convert between data formats
+  const convertToStringArray = (data: any): string[] => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    return [];
+  };
+
+  const convertToEditableItems = (data: any) => {
+    return convertToStringArray(data).map((item, index) => ({
+      id: `item-${index}`,
+      text: item,
+    }));
+  };
+
+  const convertFromEditableItems = (items: any[]) => {
+    return items.map(item => item.text);
+  };
+
+  // Handlers for updating sections
+  const handleActionItemsUpdate = (items: any[]) => {
+    const actionItems = convertFromEditableItems(items);
+    updateActionItemsMutation.mutate(actionItems);
+  };
+
+  const handleKeyTopicsUpdate = (items: any[]) => {
+    const keyTopics = convertFromEditableItems(items);
+    updateKeyTopicsMutation.mutate(keyTopics);
+  };
+
+  const handleTakeawaysUpdate = (items: any[]) => {
+    const takeaways = convertFromEditableItems(items);
+    updateTakeawaysMutation.mutate(takeaways);
   };
 
   const getPlatform = (participant: Participant) => {
@@ -554,7 +715,6 @@ export default function MeetingHighlights() {
                           <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
                         )}
                       </div>
-
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -566,39 +726,38 @@ export default function MeetingHighlights() {
                     ) : (
                       <div className="overflow-x-auto">
                         {Array.isArray(meeting?.actionItems) && meeting.actionItems.length > 0 ? (
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b">
-                                <th className="text-left py-2">#</th>
-                                <th className="text-left py-2">ACTION ITEM</th>
-                                <th className="text-left py-2">OWNER</th>
-                                <th className="text-left py-2">ACTION</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {meeting.actionItems.map((point: any, idx: number) => (
-                                <tr key={idx} className="border-b">
-                                  <td className="py-3">{idx + 1}</td>
-                                  <td className="py-3 text-sm">{point}</td>
-                                  <td className="py-3">-</td>
-                                  <td className="py-3">
-                                    <div className="flex space-x-2">
-                                      <Button variant="ghost" size="sm">
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button variant="ghost" size="sm">
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <EditableTableList
+                            items={convertToEditableItems(meeting.actionItems)}
+                            onUpdate={handleActionItemsUpdate}
+                            placeholder="Enter action item..."
+                            disabled={updateActionItemsMutation.isPending}
+                            itemType="action item"
+                            columns={[
+                              { label: "#", key: "index", width: "w-12" },
+                              { label: "ACTION ITEM", key: "text", width: "flex-1" },
+                              { label: "ACTION", key: "action", width: "w-24" },
+                            ]}
+                          />
                         ) : (
-                          <p className="text-gray-500 text-center py-4">
-                            {meeting?.transcript ? 'No Action items for this transcript' : 'Action items will be available once transcript is processed.'}
-                          </p>
+                          <div className="text-center py-4">
+                            <p className="text-gray-500 mb-4">
+                              {meeting?.transcript ? 'No Action items for this transcript' : 'Action items will be available once transcript is processed.'}
+                            </p>
+                            {meeting?.transcript && (
+                              <EditableTableList
+                                items={[]}
+                                onUpdate={handleActionItemsUpdate}
+                                placeholder="Enter action item..."
+                                disabled={updateActionItemsMutation.isPending}
+                                itemType="action item"
+                                columns={[
+                                  { label: "#", key: "index", width: "w-12" },
+                                  { label: "ACTION ITEM", key: "text", width: "flex-1" },
+                                  { label: "ACTION", key: "action", width: "w-24" },
+                                ]}
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -616,7 +775,6 @@ export default function MeetingHighlights() {
                           <RefreshCw className="h-4 w-4 animate-spin text-yellow-500" />
                         )}
                       </div>
-
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -628,37 +786,38 @@ export default function MeetingHighlights() {
                     ) : (
                       <div className="overflow-x-auto">
                         {Array.isArray(meeting?.keyTopics) && meeting.keyTopics.length > 0 ? (
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b">
-                                <th className="text-left py-2">#</th>
-                                <th className="text-left py-2">TOPIC</th>
-                                <th className="text-left py-2">ACTION</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {meeting.keyTopics.map((topic: any, idx: number) => (
-                                <tr key={idx} className="border-b">
-                                  <td className="py-3">{idx + 1}</td>
-                                  <td className="py-3 text-sm">{topic}</td>
-                                  <td className="py-3">
-                                    <div className="flex space-x-2">
-                                      <Button variant="ghost" size="sm">
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button variant="ghost" size="sm">
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <EditableTableList
+                            items={convertToEditableItems(meeting.keyTopics)}
+                            onUpdate={handleKeyTopicsUpdate}
+                            placeholder="Enter key topic..."
+                            disabled={updateKeyTopicsMutation.isPending}
+                            itemType="key topic"
+                            columns={[
+                              { label: "#", key: "index", width: "w-12" },
+                              { label: "TOPIC", key: "text", width: "flex-1" },
+                              { label: "ACTION", key: "action", width: "w-24" },
+                            ]}
+                          />
                         ) : (
-                          <p className="text-gray-500 text-center py-4">
-                            {meeting?.transcript ? 'Key topics will be generated automatically.' : 'Key topics will be available once transcript is processed.'}
-                          </p>
+                          <div className="text-center py-4">
+                            <p className="text-gray-500 mb-4">
+                              {meeting?.transcript ? 'Key topics will be generated automatically.' : 'Key topics will be available once transcript is processed.'}
+                            </p>
+                            {meeting?.transcript && (
+                              <EditableTableList
+                                items={[]}
+                                onUpdate={handleKeyTopicsUpdate}
+                                placeholder="Enter key topic..."
+                                disabled={updateKeyTopicsMutation.isPending}
+                                itemType="key topic"
+                                columns={[
+                                  { label: "#", key: "index", width: "w-12" },
+                                  { label: "TOPIC", key: "text", width: "flex-1" },
+                                  { label: "ACTION", key: "action", width: "w-24" },
+                                ]}
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -676,7 +835,6 @@ export default function MeetingHighlights() {
                           <RefreshCw className="h-4 w-4 animate-spin text-green-500" />
                         )}
                       </div>
-
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -688,37 +846,38 @@ export default function MeetingHighlights() {
                     ) : (
                       <div className="overflow-x-auto">
                         {Array.isArray(meeting?.takeaways) && meeting.takeaways.length > 0 ? (
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b">
-                                <th className="text-left py-2">#</th>
-                                <th className="text-left py-2">TAKEAWAY</th>
-                                <th className="text-left py-2">ACTION</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {meeting.takeaways.map((text: any, idx: number) => (
-                                <tr key={idx} className="border-b">
-                                  <td className="py-3">{idx + 1}</td>
-                                  <td className="py-3 text-sm">{text}</td>
-                                  <td className="py-3">
-                                    <div className="flex space-x-2">
-                                      <Button variant="ghost" size="sm">
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button variant="ghost" size="sm">
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <EditableTableList
+                            items={convertToEditableItems(meeting.takeaways)}
+                            onUpdate={handleTakeawaysUpdate}
+                            placeholder="Enter key takeaway..."
+                            disabled={updateTakeawaysMutation.isPending}
+                            itemType="takeaway"
+                            columns={[
+                              { label: "#", key: "index", width: "w-12" },
+                              { label: "TAKEAWAY", key: "text", width: "flex-1" },
+                              { label: "ACTION", key: "action", width: "w-24" },
+                            ]}
+                          />
                         ) : (
-                          <p className="text-gray-500 text-center py-4">
-                            {meeting?.transcript ? 'Key takeaways will be generated automatically.' : 'Key takeaways will be available once transcript is processed.'}
-                          </p>
+                          <div className="text-center py-4">
+                            <p className="text-gray-500 mb-4">
+                              {meeting?.transcript ? 'Key takeaways will be generated automatically.' : 'Key takeaways will be available once transcript is processed.'}
+                            </p>
+                            {meeting?.transcript && (
+                              <EditableTableList
+                                items={[]}
+                                onUpdate={handleTakeawaysUpdate}
+                                placeholder="Enter key takeaway..."
+                                disabled={updateTakeawaysMutation.isPending}
+                                itemType="takeaway"
+                                columns={[
+                                  { label: "#", key: "index", width: "w-12" },
+                                  { label: "TAKEAWAY", key: "text", width: "flex-1" },
+                                  { label: "ACTION", key: "action", width: "w-24" },
+                                ]}
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
                     )}

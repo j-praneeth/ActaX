@@ -567,6 +567,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update meeting action items
+  app.put("/api/meetings/:id/action-items", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const meetingId = req.params.id;
+      const { actionItems } = req.body;
+
+      console.log('📝 Updating action items for meeting:', meetingId, 'for user:', user.email);
+
+      // Check if meeting exists and user has access
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedMeeting = await storage.updateMeeting(meetingId, { actionItems });
+      console.log('✅ Action items updated successfully');
+
+      res.json(updatedMeeting);
+    } catch (error) {
+      console.error("❌ Update action items error:", error);
+      res.status(500).json({ message: "Failed to update action items" });
+    }
+  });
+
+  // Update meeting key topics
+  app.put("/api/meetings/:id/key-topics", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const meetingId = req.params.id;
+      const { keyTopics } = req.body;
+
+      console.log('📝 Updating key topics for meeting:', meetingId, 'for user:', user.email);
+
+      // Check if meeting exists and user has access
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedMeeting = await storage.updateMeeting(meetingId, { keyTopics });
+      console.log('✅ Key topics updated successfully');
+
+      res.json(updatedMeeting);
+    } catch (error) {
+      console.error("❌ Update key topics error:", error);
+      res.status(500).json({ message: "Failed to update key topics" });
+    }
+  });
+
+  // Update meeting takeaways
+  app.put("/api/meetings/:id/takeaways", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const meetingId = req.params.id;
+      const { takeaways } = req.body;
+
+      console.log('📝 Updating takeaways for meeting:', meetingId, 'for user:', user.email);
+
+      // Check if meeting exists and user has access
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
+
+      const organizations = await storage.getOrganizationsByOwner(user.id);
+      const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedMeeting = await storage.updateMeeting(meetingId, { takeaways });
+      console.log('✅ Takeaways updated successfully');
+
+      res.json(updatedMeeting);
+    } catch (error) {
+      console.error("❌ Update takeaways error:", error);
+      res.status(500).json({ message: "Failed to update takeaways" });
+    }
+  });
+
   // Update meeting endpoint
   app.put("/api/meetings/:id", authMiddleware, async (req: AuthenticatedRequest, res) => {
     try {

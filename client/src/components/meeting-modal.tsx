@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { X, CheckCircle, AlertCircle, Loader2, Bot, Video, Mic } from "lucide-react";
+import { X, CheckCircle, AlertCircle, Loader2, Bot, Video, Mic, Monitor, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { safeFetch } from "@/lib/safe-fetch";
 import { authService } from "@/lib/auth";
@@ -30,6 +30,13 @@ interface BotAdmissionResult {
   requiresAdmission: boolean;
 }
 
+interface PlatformInfo {
+  name: string;
+  icon: React.ReactNode;
+  color: string;
+  description: string;
+}
+
 export function MeetingModal({ isOpen, onClose, onSubmit }: MeetingModalProps) {
   const [subject, setSubject] = useState("");
   const [url, setUrl] = useState("");
@@ -41,6 +48,35 @@ export function MeetingModal({ isOpen, onClose, onSubmit }: MeetingModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Platform detection and info
+  const getPlatformInfo = (url: string): PlatformInfo | null => {
+    if (url.includes('meet.google.com')) {
+      return {
+        name: 'Google Meet',
+        icon: <Video className="w-5 h-5" />,
+        color: 'text-blue-600',
+        description: 'Google Meet meeting'
+      };
+    } else if (url.includes('zoom.us') || url.includes('zoom.com')) {
+      return {
+        name: 'Zoom',
+        icon: <Monitor className="w-5 h-5" />,
+        color: 'text-blue-500',
+        description: 'Zoom meeting'
+      };
+    } else if (url.includes('teams.microsoft.com') || url.includes('teams.live.com')) {
+      return {
+        name: 'Microsoft Teams',
+        icon: <Users className="w-5 h-5" />,
+        color: 'text-purple-600',
+        description: 'Microsoft Teams meeting'
+      };
+    }
+    return null;
+  };
+
+  const platformInfo = getPlatformInfo(url);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -48,6 +84,16 @@ export function MeetingModal({ isOpen, onClose, onSubmit }: MeetingModalProps) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if platform is supported
+    if (!platformInfo) {
+      toast({
+        title: "Unsupported Platform",
+        description: "Please use Google Meet, Zoom, or Microsoft Teams meeting URLs",
         variant: "destructive",
       });
       return;
@@ -186,29 +232,45 @@ export function MeetingModal({ isOpen, onClose, onSubmit }: MeetingModalProps) {
       
       <div>
         <Label htmlFor="url" className="text-white">
-          Google Meet URL <span className="text-red-500">*</span>
+          Meeting URL <span className="text-red-500">*</span>
         </Label>
         <Input
           id="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://meet.google.com/..."
+          placeholder="https://meet.google.com/... or https://zoom.us/j/... or https://teams.microsoft.com/l/..."
           className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
           required
         />
+        {platformInfo && (
+          <div className="mt-2 flex items-center gap-2 text-sm">
+            <span className={platformInfo.color}>
+              {platformInfo.icon}
+            </span>
+            <span className="text-gray-400">
+              {platformInfo.description} detected
+            </span>
+          </div>
+        )}
+        {url && !platformInfo && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-red-400">
+            <AlertCircle className="w-4 h-4" />
+            <span>Unsupported platform. Please use Google Meet, Zoom, or Microsoft Teams.</span>
+          </div>
+        )}
       </div>
       
       <div className="flex items-center space-x-2 text-gray-400 text-sm">
-        <span>Support:</span>
+        <span>Supported Platforms:</span>
         <div className="flex space-x-2">
-          <div className="w-6 h-6 bg-purple-600 rounded flex items-center justify-center">
-            <span className="text-white text-xs font-bold">T</span>
-          </div>
-          <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center">
-            <Video className="text-white text-xs" />
+          <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center">
+            <Video className="w-3 h-3 text-white" />
           </div>
           <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center">
-            <Mic className="text-white text-xs" />
+            <Monitor className="w-3 h-3 text-white" />
+          </div>
+          <div className="w-6 h-6 bg-purple-600 rounded flex items-center justify-center">
+            <Users className="w-3 h-3 text-white" />
           </div>
         </div>
       </div>

@@ -22,6 +22,7 @@ interface QuestionAnswer {
 interface Participant {
   id: string;
   name: string;
+  is_host: boolean;
 }
 
 export default function MeetingHighlights() {
@@ -68,7 +69,8 @@ export default function MeetingHighlights() {
       Array.from(speakerSet).forEach((name, index) => {
         participants.push({
           id: `speaker-${index}`,
-          name: name
+          name: name,
+          is_host: false
         });
       });
     } else if (Array.isArray(transcript)) {

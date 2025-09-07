@@ -137,11 +137,22 @@ class SecurityService {
     try {
       const url = new URL(meetingUrl);
       
-      // Check if it's a Google Meet URL
-      if (!url.hostname.includes('meet.google.com')) {
+      // Check if it's a supported meeting platform URL
+      const supportedDomains = [
+        'meet.google.com',
+        'zoom.us',
+        'teams.microsoft.com',
+        'teams.live.com'
+      ];
+
+      const isSupported = supportedDomains.some(domain => 
+        url.hostname.includes(domain)
+      );
+
+      if (!isSupported) {
         return {
           allowed: false,
-          reason: 'Only Google Meet URLs are supported'
+          reason: 'Only Google Meet, Zoom, and Microsoft Teams URLs are supported'
         };
       }
 

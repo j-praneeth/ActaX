@@ -2,6 +2,8 @@ import { google } from 'googleapis';
 
 export interface APIConfiguration {
   googleMeet: GoogleMeetConfig;
+  zoomMeet: ZoomMeetConfig;
+  teamsMeet: TeamsMeetConfig;
   recallAI: RecallAIConfig;
   security: SecurityConfig;
 }
@@ -12,6 +14,27 @@ export interface GoogleMeetConfig {
   redirectUri: string;
   scopes: string[];
   apiKey?: string;
+}
+
+export interface ZoomMeetConfig {
+  apiKey: string;
+  apiSecret: string;
+  baseUrl: string;
+  webhookUrl: string;
+  botName: string;
+  recordingMode: 'speaker_view' | 'gallery_view' | 'shared_screen';
+  transcriptionProvider: 'assembly_ai' | 'deepgram' | 'rev';
+}
+
+export interface TeamsMeetConfig {
+  clientId: string;
+  clientSecret: string;
+  tenantId: string;
+  baseUrl: string;
+  webhookUrl: string;
+  botName: string;
+  recordingMode: 'speaker_view' | 'gallery_view' | 'shared_screen';
+  transcriptionProvider: 'assembly_ai' | 'deepgram' | 'rev';
 }
 
 export interface RecallAIConfig {
@@ -57,6 +80,25 @@ class APIConfigurationManager {
           'https://www.googleapis.com/auth/meetings.space.readonly'
         ],
         apiKey: process.env.GOOGLE_API_KEY
+      },
+      zoomMeet: {
+        apiKey: process.env.ZOOM_API_KEY || '',
+        apiSecret: process.env.ZOOM_API_SECRET || '',
+        baseUrl: process.env.ZOOM_API_BASE_URL || 'https://api.zoom.us/v2',
+        webhookUrl: process.env.ZOOM_WEBHOOK_URL || `${process.env.BACKEND_URL}/api/webhooks/zoom`,
+        botName: process.env.ZOOM_BOT_NAME || 'Acta AI Assistant',
+        recordingMode: (process.env.ZOOM_RECORDING_MODE as any) || 'speaker_view',
+        transcriptionProvider: (process.env.ZOOM_TRANSCRIPTION_PROVIDER as any) || 'assembly_ai'
+      },
+      teamsMeet: {
+        clientId: process.env.MICROSOFT_CLIENT_ID || '',
+        clientSecret: process.env.MICROSOFT_CLIENT_SECRET || '',
+        tenantId: process.env.MICROSOFT_TENANT_ID || 'common',
+        baseUrl: process.env.MICROSOFT_GRAPH_BASE_URL || 'https://graph.microsoft.com/v1.0',
+        webhookUrl: process.env.MICROSOFT_WEBHOOK_URL || `${process.env.BACKEND_URL}/api/webhooks/teams`,
+        botName: process.env.MICROSOFT_BOT_NAME || 'Acta AI Assistant',
+        recordingMode: (process.env.MICROSOFT_RECORDING_MODE as any) || 'speaker_view',
+        transcriptionProvider: (process.env.MICROSOFT_TRANSCRIPTION_PROVIDER as any) || 'assembly_ai'
       },
       recallAI: {
         apiKey: process.env.RECALL_API_KEY || "32bd623de16c5e9a4520ed8c42085f3f9f9ceccd",
@@ -127,6 +169,20 @@ class APIConfigurationManager {
    */
   getGoogleMeetConfig(): GoogleMeetConfig {
     return this.config.googleMeet;
+  }
+
+  /**
+   * Gets Zoom Meet configuration
+   */
+  getZoomMeetConfig(): ZoomMeetConfig {
+    return this.config.zoomMeet;
+  }
+
+  /**
+   * Gets Microsoft Teams Meet configuration
+   */
+  getTeamsMeetConfig(): TeamsMeetConfig {
+    return this.config.teamsMeet;
   }
 
   /**

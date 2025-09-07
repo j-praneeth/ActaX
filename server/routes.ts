@@ -273,7 +273,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Import services
-      const { googleMeetService } = await import('./services/google-meet');
       const { securityService } = await import('./services/security');
 
       // Validate meeting data for security compliance
@@ -286,8 +285,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Determine platform and import appropriate service
+      let meetingService;
+      if (url.includes('meet.google.com')) {
+        const { googleMeetService } = await import('./services/google-meet');
+        meetingService = googleMeetService;
+      } else if (url.includes('zoom.us') || url.includes('zoom.com')) {
+        const { zoomMeetService } = await import('./services/zoom-meet');
+        meetingService = zoomMeetService;
+      } else if (url.includes('teams.microsoft.com') || url.includes('teams.live.com')) {
+        const { teamsMeetService } = await import('./services/teams-meet');
+        meetingService = teamsMeetService;
+      } else {
+        return res.status(400).json({ 
+          isActive: false, 
+          canJoin: false, 
+          message: 'Unsupported meeting platform. Please use Google Meet, Zoom, or Microsoft Teams.' 
+        });
+      }
+
       // Validate meeting access with security policies
-      const accessValidation = await googleMeetService.validateMeetingAccess(url, user.id, ipAddress, userAgent);
+      const accessValidation = await meetingService.validateMeetingAccess(url, user.id, ipAddress, userAgent);
       if (!accessValidation.hasAccess) {
         return res.status(403).json({ 
           isActive: false, 
@@ -297,7 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check meeting status
-      const meetingStatus = await googleMeetService.checkMeetingStatus(url);
+      const meetingStatus = await meetingService.checkMeetingStatus(url);
       
       res.json({
         isActive: meetingStatus.isActive,
@@ -330,14 +348,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Import services
-      const { googleMeetService } = await import('./services/google-meet');
       const { securityService } = await import('./services/security');
 
       // Record user consent for meeting recording
       await securityService.recordConsent(user.id, meetingId, true, ipAddress, userAgent);
 
+      // Determine platform and import appropriate service
+      let meetingService;
+      if (url.includes('meet.google.com')) {
+        const { googleMeetService } = await import('./services/google-meet');
+        meetingService = googleMeetService;
+      } else if (url.includes('zoom.us') || url.includes('zoom.com')) {
+        const { zoomMeetService } = await import('./services/zoom-meet');
+        meetingService = zoomMeetService;
+      } else if (url.includes('teams.microsoft.com') || url.includes('teams.live.com')) {
+        const { teamsMeetService } = await import('./services/teams-meet');
+        meetingService = teamsMeetService;
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Unsupported meeting platform. Please use Google Meet, Zoom, or Microsoft Teams.' 
+        });
+      }
+
       // Join meeting with bot
-      const result = await googleMeetService.joinMeetingWithBot(url, meetingId, user.id);
+      const result = await meetingService.joinMeetingWithBot(url, meetingId, user.id);
       
       res.json(result);
     } catch (error) {
@@ -354,10 +389,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user!;
       const meetingId = req.params.id;
 
-      // Import Google Meet service
-      const { googleMeetService } = await import('./services/google-meet');
+      // Get meeting to determine platform
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
 
-      const status = await googleMeetService.getMeetingRecordingStatus(meetingId);
+      // Import appropriate service based on platform
+      let meetingService;
+      if (meeting.platform === 'google_meet') {
+        const { googleMeetService } = await import('./services/google-meet');
+        meetingService = googleMeetService;
+      } else if (meeting.platform === 'zoom') {
+        const { zoomMeetService } = await import('./services/zoom-meet');
+        meetingService = zoomMeetService;
+      } else if (meeting.platform === 'microsoft_teams') {
+        const { teamsMeetService } = await import('./services/teams-meet');
+        meetingService = teamsMeetService;
+      } else {
+        return res.status(400).json({ message: "Unsupported meeting platform" });
+      }
+
+      const status = await meetingService.getMeetingRecordingStatus(meetingId);
       res.json(status);
     } catch (error) {
       console.error("Recording status error:", error);
@@ -370,10 +423,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user!;
       const meetingId = req.params.id;
 
-      // Import Google Meet service
-      const { googleMeetService } = await import('./services/google-meet');
+      // Get meeting to determine platform
+      const meeting = await storage.getMeeting(meetingId);
+      if (!meeting) {
+        return res.status(404).json({ message: "Meeting not found" });
+      }
 
-      const result = await googleMeetService.stopMeetingRecording(meetingId);
+      // Import appropriate service based on platform
+      let meetingService;
+      if (meeting.platform === 'google_meet') {
+        const { googleMeetService } = await import('./services/google-meet');
+        meetingService = googleMeetService;
+      } else if (meeting.platform === 'zoom') {
+        const { zoomMeetService } = await import('./services/zoom-meet');
+        meetingService = zoomMeetService;
+      } else if (meeting.platform === 'microsoft_teams') {
+        const { teamsMeetService } = await import('./services/teams-meet');
+        meetingService = teamsMeetService;
+      } else {
+        return res.status(400).json({ message: "Unsupported meeting platform" });
+      }
+
+      const result = await meetingService.stopMeetingRecording(meetingId);
       res.json(result);
     } catch (error) {
       console.error("Stop recording error:", error);

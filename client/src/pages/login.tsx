@@ -55,7 +55,8 @@ export default function Login() {
         title: "Success",
         description: "Signed in successfully",
       });
-      setLocation("/dashboard");
+      // Refresh the page to ensure proper authentication state initialization
+      window.location.href = "/dashboard";
     } catch (error) {
       toast({
         title: "Error",
@@ -141,6 +142,10 @@ export default function Login() {
                     onClick={async () => {
                       try {
                         await signInWithGoogle();
+                        // Google OAuth will handle the redirect, but we can add a refresh as backup
+                        setTimeout(() => {
+                          window.location.href = "/dashboard";
+                        }, 1000);
                       } catch (error) {
                         toast({
                           title: "Error",

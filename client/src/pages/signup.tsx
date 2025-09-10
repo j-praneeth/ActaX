@@ -57,7 +57,8 @@ export default function Signup() {
         title: "Success",
         description: "Account created successfully",
       });
-      setLocation("/dashboard");
+      // Refresh the page to ensure proper authentication state initialization
+      window.location.href = "/dashboard";
     } catch (error) {
       toast({
         title: "Error",
@@ -73,6 +74,10 @@ export default function Signup() {
     setGoogleLoading(true);
     try {
       await signUpWithGoogle();
+      // Google OAuth will handle the redirect, but we can add a refresh as backup
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 1000);
     } catch (error) {
       toast({
         title: "Error",

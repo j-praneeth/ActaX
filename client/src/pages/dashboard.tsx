@@ -22,7 +22,7 @@ import type { Meeting } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -81,6 +81,17 @@ export default function Dashboard() {
   const inProgressMeetings = filteredMeetings.filter(m => m.status === "in_progress");
 
   // Removed static recent activities and upcoming meetings
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return <div>Please log in to access the dashboard.</div>;

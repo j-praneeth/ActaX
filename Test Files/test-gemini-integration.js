@@ -1,4 +1,4 @@
-import { geminiService } from './server/services/gemini.ts';
+import { geminiService } from '../server/services/gemini.ts';
 
 // Test transcript
 const sampleTranscript = `

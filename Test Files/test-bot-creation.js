@@ -1,5 +1,5 @@
 // Test bot creation with Recall.ai API
-import { recallAIService } from './server/services/recall-ai.ts';
+import { recallAIService } from '../server/services/recall-ai.ts';
 
 async function testBotCreation() {
   try {

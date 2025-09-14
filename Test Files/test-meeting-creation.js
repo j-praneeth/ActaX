@@ -1,5 +1,5 @@
 // Test meeting creation and bot joining
-import { storage } from './server/storage.ts';
+import { storage } from '../server/storage.ts';
 
 async function testMeetingCreation() {
   // Wait a moment for storage to initialize

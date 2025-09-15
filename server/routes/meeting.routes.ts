@@ -829,4 +829,187 @@ function generateFallbackAnswer(question: string, transcript: string): string {
   return "I understand you're asking about the meeting content. While I can't provide a detailed AI-powered answer at the moment, you can find relevant information in the meeting highlights sections above, including the transcript, action points, key topics, and takeaways.";
 }
 
+// Jira sync endpoint
+router.post("/:id/sync/jira", async (req, res) => {
+  try {
+    // Get user from authentication token
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Authentication token required" });
+    }
+    
+    const token = authHeader.substring(7);
+    const authService = container.get<IAuthService>('authService');
+    const user = await authService.verifySessionToken(token);
+    
+    if (!user) {
+      return res.status(401).json({ message: "Invalid authentication token" });
+    }
+
+    const { id: meetingId } = req.params;
+    const { 
+      projectKey, 
+      issueType, 
+      priority, 
+      summary, 
+      description,
+      actionItems = []
+    } = req.body;
+
+    console.log('🔄 Jira sync request for meeting:', meetingId);
+    console.log('Sync data:', { projectKey, issueType, priority, summary, actionItems });
+
+    // Get meeting data
+    const meetingRepository = container.get<IMeetingRepository>('meetingRepository');
+    const meeting = await meetingRepository.findById(meetingId);
+    
+    if (!meeting) {
+      return res.status(404).json({ message: "Meeting not found" });
+    }
+
+    // Verify user has access to this meeting's organization
+    const organizationRepository = container.get<IOrganizationRepository>('organizationRepository');
+    const organizations = await organizationRepository.findByOwnerId(user.id);
+    const hasAccess = organizations.some(org => org.id === meeting.organizationId);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: "Access denied to this meeting" });
+    }
+
+    // Get Jira integration for this user
+    const integrations = (global as any).integrations || [];
+    console.log('🔍 Available integrations:', integrations);
+    console.log('🔍 Looking for Jira integration for user:', user.id);
+    
+    const jiraIntegration = integrations.find((integration: any) => 
+      integration.provider === 'jira' && 
+      integration.userId === user.id && 
+      integration.isActive
+    );
+
+    console.log('🔍 Found Jira integration:', jiraIntegration);
+
+    if (!jiraIntegration) {
+      return res.status(404).json({ message: "Jira integration not found. Please connect Jira first." });
+    }
+
+    // Get Jira cloud ID
+    const { cloudId, jiraUrl } = await getJiraCloudId(jiraIntegration.accessToken);
+    console.log('🔍 Using Jira cloud ID for sync:', cloudId);
+    console.log('🔍 Jira URL:', jiraUrl);
+
+    // Create Jira issues for action items
+    const createdIssues = [];
+    
+    for (const actionItem of actionItems) {
+      try {
+        const issueData = {
+          fields: {
+            project: {
+              key: projectKey
+            },
+            issuetype: {
+              name: issueType
+            },
+            priority: {
+              name: priority
+            },
+            summary: actionItem.title || summary,
+            description: {
+              type: "doc",
+              version: 1,
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    {
+                      type: "text",
+                      text: actionItem.description || description || "Action item from meeting"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        };
+
+        console.log('🔄 Creating Jira issue:', issueData);
+
+        const jiraResponse = await fetch(`https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3/issue`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${jiraIntegration.accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(issueData)
+        });
+
+        if (!jiraResponse.ok) {
+          const errorText = await jiraResponse.text();
+          console.error('❌ Failed to create Jira issue:', jiraResponse.status, errorText);
+          throw new Error(`Failed to create Jira issue: ${jiraResponse.status} - ${errorText}`);
+        }
+
+        const createdIssue = await jiraResponse.json();
+        createdIssues.push(createdIssue);
+        console.log('✅ Created Jira issue:', createdIssue.key);
+
+      } catch (error) {
+        console.error('❌ Error creating Jira issue for action item:', actionItem, error);
+        // Continue with other action items even if one fails
+      }
+    }
+
+    console.log('✅ Jira sync completed. Created issues:', createdIssues.length);
+
+    res.json({
+      success: true,
+      message: `Successfully synced ${createdIssues.length} action items to Jira`,
+      createdIssues: createdIssues.map(issue => ({
+        key: issue.key,
+        id: issue.id,
+        url: `${jiraUrl}/browse/${issue.key}`
+      }))
+    });
+
+  } catch (error) {
+    console.error("Jira sync error:", error);
+    res.status(500).json({ 
+      message: "Failed to sync to Jira", 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+// Helper function to get Jira cloud ID (imported from integration routes)
+async function getJiraCloudId(accessToken: string): Promise<{ cloudId: string; jiraUrl: string }> {
+  const tokenInfoResponse = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Accept': 'application/json'
+    }
+  });
+
+  if (!tokenInfoResponse.ok) {
+    const errorText = await tokenInfoResponse.text();
+    console.error('❌ Failed to get accessible resources:', tokenInfoResponse.status, errorText);
+    throw new Error(`Failed to get accessible resources: ${tokenInfoResponse.status} - ${errorText}`);
+  }
+
+  const accessibleResources = await tokenInfoResponse.json();
+  console.log('✅ Accessible resources:', accessibleResources);
+
+  if (!accessibleResources || accessibleResources.length === 0) {
+    throw new Error('No accessible Jira resources found');
+  }
+
+  // Use the first accessible resource (Jira cloud)
+  const jiraCloud = accessibleResources[0];
+  return {
+    cloudId: jiraCloud.id,
+    jiraUrl: jiraCloud.url
+  };
+}
+
 export { router as meetingRoutes };

@@ -54,7 +54,7 @@ export function IntegrationsPanel({ onIntegrationAdded }: IntegrationsPanelProps
         throw new Error(response.error || 'Failed to fetch integrations');
       }
 
-      setIntegrations(response.data);
+      setIntegrations(response.data || []);
     } catch (error) {
       console.error('Error fetching integrations:', error);
       toast({
@@ -88,22 +88,73 @@ export function IntegrationsPanel({ onIntegrationAdded }: IntegrationsPanelProps
 
       const { authUrl } = response.data;
       
-      // Open OAuth flow in new window
+      // Open OAuth flow in new tab with specific window name
       const popup = window.open(
         authUrl,
-        `${provider}-oauth`,
-        'width=600,height=700,scrollbars=yes,resizable=yes'
+        'jira-oauth-window',
+        'width=600,height=700,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,status=no'
       );
 
-      // Listen for popup completion
-      const checkClosed = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkClosed);
+      if (!popup) {
+        throw new Error('Popup blocked. Please allow popups for this site.');
+      }
+
+      // Listen for OAuth success message from popup
+      const handleMessage = (event: MessageEvent) => {
+        console.log('Received message from popup:', event.data);
+        console.log('Event origin:', event.origin);
+        console.log('Window origin:', window.location.origin);
+        
+        if (event.origin !== window.location.origin) {
+          console.log('Origin mismatch, ignoring message');
+          return;
+        }
+        
+        if (event.data.type === 'OAUTH_SUCCESS' && event.data.provider === provider) {
+          console.log('OAuth success detected for provider:', provider);
+          window.removeEventListener('message', handleMessage);
           setConnecting(null);
+          
+          toast({
+            title: "Success",
+            description: `${provider} integration connected successfully!`,
+          });
+          
           // Refresh integrations
           fetchIntegrations();
+        } else if (event.data.type === 'OAUTH_ERROR' && event.data.provider === provider) {
+          console.log('OAuth error detected for provider:', provider, event.data.error);
+          window.removeEventListener('message', handleMessage);
+          setConnecting(null);
+          
+          toast({
+            title: "Error",
+            description: `Failed to connect ${provider}: ${event.data.error}`,
+            variant: "destructive",
+          });
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      // Fallback: Check if popup is closed and refresh integrations
+      const checkClosed = setInterval(async () => {
+        if (popup?.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', handleMessage);
+          setConnecting(null);
+          
+          // Refresh integrations in case OAuth completed
+          await fetchIntegrations();
         }
       }, 1000);
+
+      // Stop checking after 5 minutes
+      setTimeout(() => {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', handleMessage);
+        setConnecting(null);
+      }, 300000); // 5 minutes
 
     } catch (error) {
       toast({

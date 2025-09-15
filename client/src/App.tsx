@@ -16,6 +16,8 @@ import MeetingHighlights from "@/pages/meeting-highlights";
 import MeetingAnalytics from "@/pages/meeting-analytics";
 import MeetingTranscript from "@/pages/meeting-transcript";
 import MeetingAgentsPage from "@/pages/meeting-agents";
+import IntegrationsCallback from "@/pages/integrations-callback";
+import OAuthHandler from "@/pages/oauth-handler";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedRoute() {
@@ -41,6 +43,8 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/agents" component={Agents} />
       <Route path="/integrations" component={Integrations} />
+      <Route path="/integrations/callback" component={IntegrationsCallback} />
+      <Route path="/oauth-handler" component={OAuthHandler} />
       <Route path="/settings" component={Settings} />
       <Route path="/meeting/:id/highlights" component={MeetingHighlights} />
       <Route path="/meeting/:id/analytics" component={MeetingAnalytics} />

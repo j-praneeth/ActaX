@@ -24,11 +24,21 @@ export default function Dashboard() {
   const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [updatedMeetings, setUpdatedMeetings] = useState<Meeting[]>([]);
 
   const { data: meetings = [], refetch } = useQuery<Meeting[]>({
     queryKey: ["/api/meetings"],
     enabled: !!user,
   });
+
+  // Merge fetched meetings with locally updated meetings
+  const mergedMeetings = meetings.map(meeting => {
+    const updatedMeeting = updatedMeetings.find(updated => updated.id === meeting.id);
+    return updatedMeeting || meeting;
+  });
+
+  // Note: We don't need to clear updatedMeetings manually
+  // The mergedMeetings logic will automatically use fresh server data when available
 
   const handleMeetingSubmit = async (data: { subject: string; url: string }) => {
     await apiRequest("POST", "/api/meetings", {
@@ -45,15 +55,26 @@ export default function Dashboard() {
     // Handle file upload logic here
   };
 
-  const handleEditMeeting = (meeting: any) => {
-    console.log("Edit meeting:", meeting);
-    // Handle edit meeting logic here
+  const handleEditMeeting = (updatedMeeting: Meeting) => {
+    // Update the local state with the edited meeting
+    setUpdatedMeetings(prev => {
+      const existingIndex = prev.findIndex(m => m.id === updatedMeeting.id);
+      if (existingIndex >= 0) {
+        // Update existing meeting
+        const newUpdated = [...prev];
+        newUpdated[existingIndex] = updatedMeeting;
+        return newUpdated;
+      } else {
+        // Add new updated meeting
+        return [...prev, updatedMeeting];
+      }
+    });
   };
 
   const handleDeleteMeeting = async (meetingId: string) => {
     try {
       // Get the meeting to show confirmation
-      const meeting = meetings.find(m => m.id === meetingId);
+      const meeting = mergedMeetings.find(m => m.id === meetingId);
       if (!meeting) {
         toast({
           title: "Error",
@@ -106,7 +127,7 @@ export default function Dashboard() {
     setIsRecorderOpen(true);
   };
 
-  const filteredMeetings = meetings.filter(meeting =>
+  const filteredMeetings = mergedMeetings.filter(meeting =>
     meeting.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     meeting.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -207,7 +228,7 @@ export default function Dashboard() {
                       <CardTitle className="text-sm font-medium">Total Meetings</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{meetings.length}</div>
+                      <div className="text-2xl font-bold">{mergedMeetings.length}</div>
                     </CardContent>
                   </Card>
                   <Card>

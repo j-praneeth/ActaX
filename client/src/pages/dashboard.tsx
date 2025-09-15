@@ -1,34 +1,31 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { Header } from "@/components/header";
 import { MainSidebar } from "@/components/main-sidebar";
-import { MeetingCard } from "@/components/meeting-card";
 import { MeetingModal } from "@/components/meeting-modal";
 import { AudioRecorder } from "@/components/meeting/AudioRecorder";
 import { PlusMenu } from "@/components/plus-menu";
 import { UploadAudio } from "@/components/upload-audio";
 import { MeetingsTable } from "@/components/meetings-table";
-import { MeetingCreationModal } from "@/components/meeting-creation-modal";
 import { MeetingDetailsCard } from "@/components/meeting-details-card";
 import { IntegrationsPanel } from "@/components/integrations-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
-import { Plus, Search } from "lucide-react";
 import type { Meeting } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
+  const [searchQuery] = useState("");
   const [isMeetingModalOpen, setIsMeetingModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
 
-  const { data: meetings = [], isLoading, refetch } = useQuery<Meeting[]>({
+  const { data: meetings = [], refetch } = useQuery<Meeting[]>({
     queryKey: ["/api/meetings"],
     enabled: !!user,
   });
@@ -54,8 +51,46 @@ export default function Dashboard() {
   };
 
   const handleDeleteMeeting = async (meetingId: string) => {
-    // Optional: Implement DELETE route when available
-    console.log("Delete meeting:", meetingId);
+    try {
+      // Get the meeting to show confirmation
+      const meeting = meetings.find(m => m.id === meetingId);
+      if (!meeting) {
+        toast({
+          title: "Error",
+          description: "Meeting not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        `Are you sure you want to delete the meeting "${meeting.title}"? This action cannot be undone.`
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+
+      // Make DELETE request (apiRequest handles authentication automatically)
+      await apiRequest("DELETE", `/api/meetings/${meetingId}`);
+
+      // Show success message
+      toast({
+        title: "Success",
+        description: "Meeting deleted successfully",
+      });
+
+      // Refresh the meetings list
+      await refetch();
+    } catch (error) {
+      console.error('Failed to delete meeting:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete meeting",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleInviteLiveMeeting = () => {
@@ -78,7 +113,6 @@ export default function Dashboard() {
 
   const completedMeetings = filteredMeetings.filter(m => m.status === "completed");
   const scheduledMeetings = filteredMeetings.filter(m => m.status === "scheduled");
-  const inProgressMeetings = filteredMeetings.filter(m => m.status === "in_progress");
 
   // Removed static recent activities and upcoming meetings
 
@@ -145,7 +179,10 @@ export default function Dashboard() {
                       ← Back to Meetings
                     </Button>
                     <MeetingDetailsCard 
-                      meeting={selectedMeeting} 
+                      meeting={{
+                        ...selectedMeeting,
+                        description: selectedMeeting?.description ?? undefined
+                      } as any} 
                       onSync={() => refetch()}
                     />
                   </div>

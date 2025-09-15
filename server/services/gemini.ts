@@ -177,6 +177,36 @@ Please provide a clear, helpful answer based on the meeting content. If the ques
   }
 
   /**
+   * Generate an answer to a question about the meeting transcript
+   */
+  async generateAnswer(question: string, transcript: string): Promise<string> {
+    if (!this.model) {
+      throw new Error('Gemini API key not configured');
+    }
+
+    const prompt = `
+You are an AI assistant helping users understand meeting content. Please answer the following question based on the meeting transcript provided.
+
+Question: ${question}
+
+Meeting Transcript:
+${transcript}
+
+Please provide a helpful, accurate answer based on the transcript content. If the question cannot be answered from the transcript, please say so clearly. Keep your answer concise but informative.
+
+Answer:`;
+
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
+    } catch (error) {
+      console.error('Error generating answer with Gemini:', error);
+      throw new Error('Failed to generate answer with Gemini');
+    }
+  }
+
+  /**
    * Check if Gemini is available
    */
   isAvailable(): boolean {

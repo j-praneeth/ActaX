@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { supabaseService } from './supabase';
 import { storage } from '../storage';
-import type { InsertUser, InsertOrganization } from '@shared/schema';
+import type { InsertUser, InsertOrganization } from '../../shared/schema';
 
 interface GoogleUserInfo {
   id: string;
@@ -19,24 +19,30 @@ class GoogleAuthService {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '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';
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.CALLBACK_BASE_URL || 'http://localhost:5000'}/api/auth/google/callback`;
 
-    if (!clientId || !clientSecret) {
-      throw new Error('Missing required Google OAuth environment variables: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET');
-    }
-
     console.log('Google OAuth Config:', {
       clientId: clientId ? `${clientId.substring(0, 10)}...` : 'MISSING',
       clientSecret: clientSecret ? 'SET' : 'MISSING',
       redirectUri
     });
 
-    this.oauth2Client = new google.auth.OAuth2(
-      clientId,
-      clientSecret,
-      redirectUri
-    );
+    try {
+      this.oauth2Client = new google.auth.OAuth2(
+        clientId,
+        clientSecret,
+        redirectUri
+      );
+    } catch (error) {
+      console.error('Failed to initialize Google OAuth client:', error);
+      this.oauth2Client = null;
+    }
   }
 
   getAuthUrl(state?: string): string {
+    if (!this.oauth2Client) {
+      console.error('Google OAuth client not initialized');
+      return '';
+    }
+
     const scopes = [
       'openid',
       'email',
@@ -55,7 +61,12 @@ class GoogleAuthService {
       authUrlOptions.state = state;
     }
 
-    return this.oauth2Client.generateAuthUrl(authUrlOptions);
+    try {
+      return this.oauth2Client.generateAuthUrl(authUrlOptions);
+    } catch (error) {
+      console.error('Failed to generate Google auth URL:', error);
+      return '';
+    }
   }
 
   async handleCallback(code: string, state?: string): Promise<{ user: any; token: string; isNewUser?: boolean }> {

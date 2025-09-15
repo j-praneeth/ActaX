@@ -66,7 +66,7 @@ export const supabaseService = {
         type: 'magiclink',
         email: user.email,
         options: {
-          redirectTo: `${process.env.CALLBACK_BASE_URL || 'http://localhost:5000'}/dashboard`
+          redirectTo: `${process.env.CALLBACK_BASE_URL || 'http://localhost:3000'}/dashboard`
         }
       });
 

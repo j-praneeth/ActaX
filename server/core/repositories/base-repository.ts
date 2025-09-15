@@ -1,0 +1,14 @@
+import { PrismaClient } from '@prisma/client';
+
+export abstract class BaseRepository {
+  protected prisma: PrismaClient;
+
+  constructor(prisma: PrismaClient) {
+    this.prisma = prisma;
+  }
+
+  protected handleError(error: any, operation: string): never {
+    console.error(`Database error during ${operation}:`, error);
+    throw new Error(`Failed to ${operation}: ${error.message}`);
+  }
+}

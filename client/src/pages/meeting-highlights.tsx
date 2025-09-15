@@ -61,10 +61,51 @@ export default function MeetingHighlights() {
   const extractParticipantsFromTranscript = (transcript: any): Participant[] => {
     const participants: Participant[] = [];
 
+    // Try to parse as JSON first
+    let parsedTranscript = transcript;
     if (typeof transcript === 'string') {
-      // Parse transcript string to extract speaker names
-      // Look for patterns like "Speaker Name: text" or "Name: text"
-      const lines = transcript.split('\n');
+      try {
+        parsedTranscript = JSON.parse(transcript);
+      } catch {
+        parsedTranscript = transcript;
+      }
+    }
+
+    // Handle structured transcript data from Recall.ai
+    if (parsedTranscript && typeof parsedTranscript === 'object') {
+      // Check if it's the live transcript format with speakers array
+      if (parsedTranscript.speakers && Array.isArray(parsedTranscript.speakers)) {
+        const speakerMap = new Map<string, Participant>();
+        
+        parsedTranscript.speakers.forEach((speaker: any, index: number) => {
+          const speakerName = speaker.name || speaker.speaker || `Speaker ${index + 1}`;
+          
+          if (!speakerMap.has(speakerName)) {
+            // Look for host indicators in the speaker data
+            const isHost = speaker.is_host || 
+                          speaker.role === 'host' || 
+                          speakerName.toLowerCase().includes('host') ||
+                          speakerName.toLowerCase().includes('organizer') ||
+                          speakerName.toLowerCase().includes('moderator');
+            
+            speakerMap.set(speakerName, {
+              id: speaker.id || `participant-${speakerName.toLowerCase().replace(/\s+/g, '-')}`,
+              name: speakerName,
+              is_host: isHost,
+              platform: meeting?.platform || 'unknown',
+              role: isHost ? 'host' : 'participant',
+              extra_data: speaker.extra_data || {}
+            });
+          }
+        });
+        
+        return Array.from(speakerMap.values());
+      }
+    }
+
+    // Fallback to parsing as plain text
+    if (typeof parsedTranscript === 'string') {
+      const lines = parsedTranscript.split('\n');
       const speakerSet = new Set<string>();
 
       lines.forEach(line => {
@@ -84,20 +125,28 @@ export default function MeetingHighlights() {
         }
       });
 
-      // Convert to participants array
+      // Convert to participants array - don't assume first is host
       Array.from(speakerSet).forEach((name, index) => {
+        // Look for host indicators in the name
+        const isHost = name.toLowerCase().includes('host') ||
+                      name.toLowerCase().includes('organizer') ||
+                      name.toLowerCase().includes('moderator') ||
+                      name.toLowerCase().includes('facilitator');
+        
         participants.push({
           id: index + 1,
           name: name,
-          is_host: false,
-          platform: 'unknown',
+          is_host: isHost,
+          platform: meeting?.platform || 'unknown',
+          role: isHost ? 'host' : 'participant',
+          email: null,
         });
       });
-    } else if (Array.isArray(transcript)) {
+    } else if (Array.isArray(parsedTranscript)) {
       // Handle array format (if transcript is structured data)
       const speakerSet = new Set<string>();
 
-      transcript.forEach((item: any) => {
+      parsedTranscript.forEach((item: any) => {
         if (item.participant && item.participant.name) {
           speakerSet.add(item.participant.name);
         } else if (item.speaker) {
@@ -108,11 +157,19 @@ export default function MeetingHighlights() {
       });
 
       Array.from(speakerSet).forEach((name, index) => {
+        // Look for host indicators in the name
+        const isHost = name.toLowerCase().includes('host') ||
+                      name.toLowerCase().includes('organizer') ||
+                      name.toLowerCase().includes('moderator') ||
+                      name.toLowerCase().includes('facilitator');
+        
         participants.push({
           id: index + 1,
           name: name,
-          is_host: false,
-          platform: 'unknown',
+          is_host: isHost,
+          platform: meeting?.platform || 'unknown',
+          role: isHost ? 'host' : 'participant',
+          email: null,
         });
       });
     }
@@ -317,13 +374,13 @@ export default function MeetingHighlights() {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch(`/api/meetings/${params.id}/action-items`, {
-        method: 'PUT',
+      const response = await fetch(`/api/meetings/${params.id}/highlights`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`,
         },
-        body: JSON.stringify({ actionItems }),
+        body: JSON.stringify({ field: 'actionItems', data: actionItems }),
       });
 
       if (!response.ok) {
@@ -359,13 +416,13 @@ export default function MeetingHighlights() {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch(`/api/meetings/${params.id}/key-topics`, {
-        method: 'PUT',
+      const response = await fetch(`/api/meetings/${params.id}/highlights`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`,
         },
-        body: JSON.stringify({ keyTopics }),
+        body: JSON.stringify({ field: 'keyTopics', data: keyTopics }),
       });
 
       if (!response.ok) {
@@ -401,13 +458,13 @@ export default function MeetingHighlights() {
         throw new Error('Authentication required');
       }
 
-      const response = await fetch(`/api/meetings/${params.id}/takeaways`, {
-        method: 'PUT',
+      const response = await fetch(`/api/meetings/${params.id}/highlights`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`,
         },
-        body: JSON.stringify({ takeaways }),
+        body: JSON.stringify({ field: 'takeaways', data: takeaways }),
       });
 
       if (!response.ok) {
@@ -504,6 +561,139 @@ export default function MeetingHighlights() {
       return "microsoft_teams";
     }
     return "unknown";
+  };
+
+    // Parse transcript with timestamps and speakers
+    const parseTranscriptWithTimestamps = (transcript: any) => {
+      if (!transcript) return [];
+
+      // If transcript is a string, try to parse it as JSON first
+      let parsedTranscript = transcript;
+      if (typeof transcript === 'string') {
+        try {
+          parsedTranscript = JSON.parse(transcript);
+        } catch {
+          // If JSON parsing fails, treat as plain text
+          parsedTranscript = transcript;
+        }
+      }
+
+      // Handle structured transcript data from Recall.ai
+      if (parsedTranscript && typeof parsedTranscript === 'object') {
+        // Check if it's the live transcript format with speakers array
+        if (parsedTranscript.speakers && Array.isArray(parsedTranscript.speakers)) {
+          return parsedTranscript.speakers.map((speaker: any) => ({
+            timestamp: formatTimestamp(speaker.timestamp),
+            speaker: speaker.name,
+            text: speaker.text,
+            isTimestamp: true
+          }));
+        }
+
+        // Check if it's the transcript_text format
+        if (parsedTranscript.transcript_text) {
+          return parseTranscriptText(parsedTranscript.transcript_text);
+        }
+
+        // Check if it's the text field
+        if (parsedTranscript.text) {
+          return parseTranscriptText(parsedTranscript.text);
+        }
+      }
+
+      // Fallback to parsing as plain text
+      if (typeof parsedTranscript === 'string') {
+        return parseTranscriptText(parsedTranscript);
+      }
+
+      return [];
+    };
+
+    // Format timestamp from Recall.ai (e.g., "04:41" or "00:04:41")
+    const formatTimestamp = (timestamp: string) => {
+      if (!timestamp) return '';
+      
+      // If timestamp is already in MM:SS format, return as is
+      if (timestamp.match(/^\d{1,2}:\d{2}$/)) {
+        return timestamp;
+      }
+      
+      // If timestamp is in HH:MM:SS format, return as is
+      if (timestamp.match(/^\d{1,2}:\d{2}:\d{2}$/)) {
+        return timestamp;
+      }
+      
+      // If timestamp is in seconds, convert to MM:SS
+      const seconds = parseInt(timestamp);
+      if (!isNaN(seconds)) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+      }
+      
+      return timestamp;
+    };
+
+  // Parse plain text transcript
+  const parseTranscriptText = (text: string) => {
+    const lines = text.split('\n');
+    const parsedLines: Array<{
+      timestamp?: string;
+      speaker?: string;
+      text: string;
+      isTimestamp: boolean;
+    }> = [];
+    
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return;
+      
+      // Check for timestamp patterns like [00:12:34] or 00:12:34 or [12:34]
+      const timestampMatch = trimmedLine.match(/^(\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?)\s*(.*)/);
+      
+      if (timestampMatch) {
+        const [, fullTimestamp, cleanTimestamp, rest] = timestampMatch;
+        
+        // Check if the rest contains a speaker name
+        const speakerMatch = rest.match(/^([^:]+):\s*(.*)/);
+        
+        if (speakerMatch) {
+          const [, speaker, text] = speakerMatch;
+          parsedLines.push({
+            timestamp: cleanTimestamp,
+            speaker: speaker.trim(),
+            text: text.trim(),
+            isTimestamp: true
+          });
+        } else {
+          // Just timestamp with text, no speaker
+          parsedLines.push({
+            timestamp: cleanTimestamp,
+            text: rest.trim(),
+            isTimestamp: true
+          });
+        }
+      } else {
+        // Check if it's a speaker line without timestamp
+        const speakerMatch = trimmedLine.match(/^([^:]+):\s*(.*)/);
+        if (speakerMatch) {
+          const [, speaker, text] = speakerMatch;
+          parsedLines.push({
+            speaker: speaker.trim(),
+            text: text.trim(),
+            isTimestamp: false
+          });
+        } else {
+          // Regular text line
+          parsedLines.push({
+            text: trimmedLine,
+            isTimestamp: false
+          });
+        }
+      }
+    });
+    
+    return parsedLines;
   };
 
   // Automatically fetch transcript when page loads if not available
@@ -606,11 +796,36 @@ export default function MeetingHighlights() {
                           </Button> */}
                         </div>
                         <div className="max-h-96 overflow-y-auto">
-                          <div className="whitespace-pre-wrap text-sm text-gray-700 p-4 bg-gray-50 rounded-lg border leading-relaxed">
-                            {typeof meeting.transcript === 'string'
-                              ? meeting.transcript
-                              : JSON.stringify(meeting.transcript, null, 2)
-                            }
+                          <div className="space-y-2 p-4 bg-gray-50 rounded-lg border">
+                            {typeof meeting.transcript === 'string' ? (
+                              parseTranscriptWithTimestamps(meeting.transcript).map((line, index) => (
+                                <div key={index} className="flex items-start space-x-3 py-1">
+                                  {line.timestamp && (
+                                    <div className="flex-shrink-0">
+                                      <span className="text-xs text-blue-600 font-mono bg-blue-100 px-2 py-1 rounded">
+                                        {line.timestamp}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    {line.speaker && (
+                                      <div className="flex items-center space-x-2 mb-1">
+                                        <span className="text-sm font-semibold text-gray-800">
+                                          {line.speaker}:
+                                        </span>
+                                      </div>
+                                    )}
+                                    <div className="text-sm text-gray-700 leading-relaxed">
+                                      {line.text}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="whitespace-pre-wrap text-sm text-gray-700 leading-relaxed">
+                                {JSON.stringify(meeting.transcript, null, 2)}
+                              </div>
+                            )}
                           </div>
                         </div>
                         {/* {meeting.transcript && (
@@ -914,7 +1129,7 @@ export default function MeetingHighlights() {
                       <div className="space-y-3">
                         {participants.map((participant) => (
                           <div key={participant.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${participant.is_host ? 'bg-blue-500' : 'bg-blue-500'
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${participant.is_host ? 'bg-blue-600' : 'bg-gray-500'
                               }`}>
                               {participant.name.charAt(0).toUpperCase()}
                             </div>
@@ -926,32 +1141,40 @@ export default function MeetingHighlights() {
                                 {participant.is_host && (
                                   <div className="flex items-center space-x-1 bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">
                                     <User className="h-3 w-3" />
-                                    <span className="font-medium">{participant.is_host ? 'Host' : 'Member'}</span>
+                                    <span className="font-medium">Host</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-2 mt-1">
+                                <div className="flex items-center space-x-1 text-xs text-gray-500">
+                                  <Monitor className="h-3 w-3" />
+                                  <span className="capitalize">{participant.platform || 'Unknown'}</span>
+                                </div>
+                                {participant.role && (
+                                  <div className="text-xs text-gray-400">
+                                    {participant.role}
                                   </div>
                                 )}
                               </div>
                             </div>
-                            {participant.extra_data && (
-                              <div className="text-xs text-gray-400">
-                                <div className="text-center flex flex-col items-center">
-                                  <div className="w-6 h-6 rounded flex justify-center items-center">
-                                    {/* <Monitor className="h-3 w-3 text-blue-600" /> */}
-                                    
-                                      {participant.extra_data.zoom ? <img src='../../public/icons8-zoom-48.png' alt="Zoom" className="h-6 w-6" /> : participant.extra_data.google_meet ? <img src='../../public/icons8-google-meet-48.png' alt="Google Meet" className="h-6 w-6" /> : participant.extra_data.microsoft_teams ? <img src="../../public/icons8-microsoft-teams-48.png" alt="Microsoft Teams" className="h-6 w-6" /> : <span>Unknown</span>}
-                                    
-                                  </div>
-                                  <span className="mt-1 block">
-                                    {participant.extra_data.zoom
-                                      ? "Zoom"
-                                      : participant.extra_data.google_meet
-                                        ? "Google Meet"
-                                        : participant.extra_data.microsoft_teams
-                                          ? "Microsoft Teams"
-                                          : "Unknown"}
-                                  </span>
+                            <div className="text-xs text-gray-400">
+                              <div className="text-center flex flex-col items-center">
+                                <div className="w-6 h-6 rounded flex justify-center items-center">
+                                  {participant.platform === 'zoom' ? (
+                                    <img src='/icons8-zoom-48.png' alt="Zoom" className="h-6 w-6" />
+                                  ) : participant.platform === 'google_meet' ? (
+                                    <img src='/icons8-google-meet-48.png' alt="Google Meet" className="h-6 w-6" />
+                                  ) : participant.platform === 'microsoft_teams' ? (
+                                    <img src="/icons8-microsoft-teams-48.png" alt="Microsoft Teams" className="h-6 w-6" />
+                                  ) : (
+                                    <Monitor className="h-4 w-4 text-gray-400" />
+                                  )}
                                 </div>
+                                <span className="mt-1 block text-xs">
+                                  {participant.platform || 'Unknown'}
+                                </span>
                               </div>
-                            )}
+                            </div>
 
                           </div>
                         ))}
